@@ -1,0 +1,21 @@
+fastapi>=0.111
+uvicorn[standard]>=0.30
+pydantic>=2.7
+pydantic-settings>=2.3
+supabase>=2.5
+# Pin redis to the 5.x line and rq to the 1.x line. rq 2.x changed its Queue to
+# default to an async (asyncio) Redis connection and assumes `is_async=True`,
+# which breaks enqueue when the app passes a synchronous `redis.Redis` instance
+# (as core/redis.py does). With rq 1.x + redis 5.x the sync connection works with
+# the `rq worker` CLI exactly as the code intends. Do NOT bump these without
+# re-testing the enqueue path.
+redis>=5.0,<6.0
+rq>=1.16,<2.0
+groq>=0.9
+pdfminer.six>=20240706
+python-dotenv>=1.0
+PyJWT>=2.8
+# Needed for ES256/RS256 (JWKS) token verification on newer Supabase projects.
+cryptography>=42.0
+requests>=2.31
+python-multipart>=0.0.9

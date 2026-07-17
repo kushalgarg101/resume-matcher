@@ -1,0 +1,10 @@
+# Normalize line endings so cross-platform clones stay consistent.
+* text=auto eol=lf
+
+# Windows-specific files
+*.bat text eol=crlf
+
+# Binary / generated assets should not be diffed.
+*.png binary
+*.jpg binary
+*.pdf binary
