@@ -1,0 +1,84 @@
+# Render Blueprint: defines the web API, the RQ worker, and the Redis broker
+# as three separate free-tier services in one repo.
+#
+# Deploy: Render Dashboard -> New -> Blueprint -> connect this repo (rootDir=backend).
+# Render reads this file and creates all three services. The REDIS_URL env var
+# is auto-injected by Render's Redis service into the other two.
+
+services:
+  - type: web
+    name: resume-matcher-api
+    runtime: docker
+    rootDir: backend
+    dockerfilePath: ./Dockerfile
+    plan: free
+    healthCheckPath: /healthz
+    envVars:
+      - key: PORT
+        value: "10000"
+      - key: REDIS_URL
+        fromService:
+          type: redis
+          name: resume-matcher-redis
+          property: connectionString
+      - key: ENV
+        value: production
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_ANON_KEY
+        sync: false
+      - key: SUPABASE_SERVICE_KEY
+        sync: false
+      - key: SUPABASE_JWT_SECRET
+        sync: false
+      - key: SUPABASE_STORAGE_BUCKET
+        value: resumes
+      - key: GROQ_API_KEY
+        sync: false
+      - key: GROQ_MODEL
+        value: llama-3.1-8b-instant
+      # REQUIRED: comma-separated list of allowed frontend origins (e.g. your
+      # Vercel URL). If left blank the API refuses to start, because CORS with
+      # credentials would otherwise block every browser request.
+      - key: CORS_ALLOW_ORIGINS
+        sync: false
+      # Shared secret for the internal /internal/reap endpoint (called by the
+      # keepalive cron). Generate any long random string.
+      - key: INTERNAL_API_KEY
+        sync: false
+
+  - type: worker
+    name: resume-matcher-worker
+    runtime: docker
+    rootDir: backend
+    dockerfilePath: ./Dockerfile
+    plan: free
+    # Override the Dockerfile CMD to run the RQ worker instead of the API.
+    startCommand: rq worker default --url $REDIS_URL
+    envVars:
+      - key: REDIS_URL
+        fromService:
+          type: redis
+          name: resume-matcher-redis
+          property: connectionString
+      - key: ENV
+        value: production
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_ANON_KEY
+        sync: false
+      - key: SUPABASE_SERVICE_KEY
+        sync: false
+      - key: SUPABASE_JWT_SECRET
+        sync: false
+      - key: SUPABASE_STORAGE_BUCKET
+        value: resumes
+      - key: GROQ_API_KEY
+        sync: false
+      - key: GROQ_MODEL
+        value: llama-3.1-8b-instant
+
+  - type: redis
+    name: resume-matcher-redis
+    plan: free
+    ipAllowList: []
