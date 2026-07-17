@@ -1,0 +1,31 @@
+name: Keep-Alive
+
+# Render free tier spins down after 15 min idle, and Supabase free projects
+# pause after 7 days of inactivity. This cron pings both to keep them warm.
+on:
+  schedule:
+    # Every 14 minutes (Render sleeps at 15) — stays within free limits.
+    - cron: "*/14 * * * *"
+  workflow_dispatch:
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping Render API
+        run: curl -fsS "${{ secrets.RENDER_API_URL }}/ping" || echo "render ping failed"
+
+      - name: Ping Supabase (reset inactivity pause timer)
+        run: |
+          curl -fsS "${{ secrets.SUPABASE_URL }}/rest/v1/" \
+            -H "apikey: ${{ secrets.SUPABASE_ANON_KEY }}" \
+            -o /dev/null || echo "supabase ping failed"
+
+      - name: Reap stuck analysis rows
+        # Marks analysis rows stuck in queued/processing (e.g. API crashed after
+        # insert but before enqueue) as failed so users see a clean error instead
+        # of a permanent spinner. Protected by INTERNAL_API_KEY.
+        run: |
+          curl -fsS -X POST "${{ secrets.RENDER_API_URL }}/internal/reap" \
+            -H "x-internal-key: ${{ secrets.INTERNAL_API_KEY }}" \
+            -o /dev/null || echo "reap call failed"
