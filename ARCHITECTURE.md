@@ -57,9 +57,16 @@ worker re-downloads the PDF from Supabase Storage. Benefits:
 
 - `profiles` (1:1 with `auth.users`, auto-created by trigger).
 - `analyses` with a `status` state machine: `queued → processing → completed|failed`.
-- RLS policies: `select`/`insert` scoped to `auth.uid() = user_id`. Updates are
-  performed only by the worker via `service_role`, so no `update` policy for
-  `authenticated` users (defence in depth).
+- `user_profiles` — structured resume data (skills, experience, education, etc.),
+   filled by extraction on analysis or via agent chat.
+- `chat_conversations` + `chat_messages` — agent session storage.
+- `jobs` — normalised job listings from various sources.
+- `applications` — user job applications with status pipeline.
+- RLS policies: all tables scoped to `auth.uid() = user_id` for
+  `select`/`insert`/`update`/`delete`. The `jobs` table is select-only for all
+  authenticated users (shared feed). Updates are performed only by the worker
+  via `service_role`, so no `update` policy for `authenticated` users on
+  `analyses` (defence in depth).
 
 ## 5. LLM integration & rate limits
 
@@ -74,7 +81,62 @@ Groq's free tier is **30 RPM / ~6K TPM / 1K–14.4K RPD** (model-dependent). Des
 - Model is **env-configurable** (`GROQ_MODEL`) so you can swap 8B (high quota)
   vs 70B (stronger reasoning) without code changes.
 
-## 6. Free-tier reliability tricks
+## 6. Job aggregation system
+
+The job aggregation layer (`app/jobs/`) is a modular source system designed for
+easy extensibility:
+
+- **Base class** (`sources/base.py`): an ABC defining `fetch()` → list of raw
+  dicts and `normalized_job()` → `NormalizedJob`. Each source implements
+  its own HTTP fetching and response parsing.
+- **Source implementations**:
+  - `arbeitnow.py` — REST API with pagination, native `location` field.
+  - `jooble.py` — REST API with custom salary parser (`€50K`, `$1M`, `£40K`).
+  - `adzuna.py` — REST API with salary normalisation.
+  - `rss_source.py` — RSS/Atom feeds (RemoteOK, We Work Remotely, LinkedIn) with
+    tag-based requirements parsing.
+- **Fetcher** (`fetcher.py`): runs all sources concurrently, deduplicates by
+  `source:external_id`, skips entries with `None` external IDs.
+- **Sync** (`sync.py`): upserts to Supabase with conflict handling on the
+  `(external_id, source)` unique index.
+- **Periodic sync**: `main.py` spawns an `asyncio.create_task` that calls
+  `sync_all_sources` via `asyncio.to_thread` every 6 hours. Triggers an
+  on-demand sync when the jobs table is empty.
+- **Design trade-off**: We accept occasional duplicates across sources (same
+  job posted on RemoteOK and Jooble) in favour of simpler code. A content-based
+  dedup (title + company hash) could be added later.
+
+**Why not a single API?** No single free job board provides comprehensive
+coverage. By supporting multiple sources with graceful degradation (missing API
+keys just skip that source), we maximise the job feed quality while keeping the
+system zero-cost.
+
+## 7. Job matching (matcher_v2)
+
+The `matcher_v2` service computes a 0–100 match score between a user profile
+and a job listing:
+
+| Component | Weight | Logic |
+|-----------|--------|-------|
+| Skills    | 60%    | Intersection-over-union of profile skills vs job requirements |
+| Role      | 20%    | Keyword overlap with preferred roles |
+| Location  | 10%    | Remote-friendly, location fuzzy match |
+| Experience| 10%    | Years-of-experience proximity |
+
+The breakdown is returned alongside matched/missing skill lists for transparency.
+
+## 8. Profile extraction & agent chat
+
+- **Profile extraction** (`profile_extraction.py`): called automatically after
+  resume scoring. Uses Groq to parse resume text into structured fields (skills,
+  experience, education, projects). Only fills empty fields to avoid overwriting
+  user edits.
+- **Chat agent** (`chat_agent.py`): a conversational interface powered by Groq
+  that interactively fills and refines the user profile. The agent maintains
+  conversation context and updates profile fields via function calls. This
+  progressive-fill approach avoids overwhelming users with a long form.
+
+## 9. Free-tier reliability tricks
 
 - **Render sleep (15 min):** a GitHub Actions cron hits `/ping` every 14 min.
 - **Supabase pause (7 days):** the same cron hits the REST endpoint, which
@@ -87,24 +149,31 @@ Groq's free tier is **30 RPM / ~6K TPM / 1K–14.4K RPD** (model-dependent). Des
   worker to boot (often 15–50s on the free tier). The client already polls for up
   to ~2.5 minutes to absorb this. No action needed for a demo.
 
-## 7. Failure handling
+## 10. Failure handling
 
 - If extraction or the LLM fails, the worker sets `status = failed` and records a
   truncated `error_message` on the row — the user sees a clear failure instead of
   a hung spinner.
 - Upload validation rejects non-PDF and oversized files before any processing.
+- Job source failures are isolated: one source timing out doesn't block others.
+  Errors are collected and reported in the sync result.
+- Profile extraction is best-effort; if it fails, the analysis result is still
+  saved and the profile extraction is simply skipped.
 
-## 8. Testing strategy
+## 11. Testing strategy
 
-- **Unit:** PDF extraction, JSON parsing/normalisation, LLM backoff (Groq mocked).
+- **Unit:** PDF extraction, JSON parsing/normalisation, LLM backoff (Groq mocked),
+  salary parsing, JWKS verification.
 - **Integration:** API routes with Supabase/Redis/Auth mocked via `TestClient` —
   verifies auth enforcement, validation, and the enqueue path without network.
 - CI runs `ruff` + `pytest` on every push to `backend/`.
 
-## 9. Possible extensions (good for follow-up interviews)
+## 12. Possible extensions (good for follow-up interviews)
 
 - Webhook / WebSocket push instead of polling.
 - Caching: skip re-scoring identical (resume hash, JD hash) pairs.
 - Batch mode: score one resume against many JDs.
 - Add OAuth (Google) login — the schema/RLS already supports it.
 - Metrics: track p95 scoring latency and Groq 429 rate in a dashboard.
+- Job alerting: email/SMS notifications for new jobs matching saved filters.
+- Content-based job deduplication (title + company hash across sources).
