@@ -1,9 +1,10 @@
 "use client";
 
-import { SlidersHorizontal, X } from "lucide-react";
+import { SlidersHorizontal, X, MapPin } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Separator } from "@/components/ui/separator";
 
 export type JobFilterValues = {
   q: string;
@@ -97,35 +98,41 @@ export default function JobFilters({ filters, onChange, onReset }: JobFiltersPro
     (filters.location ? 1 : 0);
 
   return (
-    <div className="rounded-xl border border-border bg-card p-4">
-      <div className="mb-3 flex items-center justify-between">
+    <div className="rounded-2xl border border-border/80 bg-card/60 backdrop-blur-md p-5 space-y-5 shadow-xs">
+      <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <SlidersHorizontal className="h-4 w-4 text-muted-foreground" />
-          <span className="text-sm font-medium">Filters</span>
+          <SlidersHorizontal className="h-4 w-4 text-muted-foreground/80" />
+          <span className="text-sm font-semibold tracking-tight text-foreground">Filters</span>
           {remoteCount > 0 && (
-            <Badge variant="secondary" className="text-[10px]">{remoteCount}</Badge>
+            <Badge variant="secondary" className="bg-primary/10 text-primary text-[10px] font-medium border-0 px-2 py-0.5 rounded-full">{remoteCount}</Badge>
           )}
         </div>
         {hasFilters && (
-          <Button variant="ghost" size="sm" className="h-6 text-xs text-muted-foreground" onClick={onReset}>
-            <X className="mr-1 h-3 w-3" />Reset
+          <Button variant="ghost" size="sm" className="h-7 text-xs text-muted-foreground hover:text-foreground" onClick={onReset}>
+            <X className="mr-1 h-3.5 w-3.5" />Reset
           </Button>
         )}
       </div>
 
-      {/* Remote toggle */}
-      <div className="mb-3">
-        <label className="mb-1 block text-xs font-medium text-muted-foreground">Remote</label>
-        <div className="flex gap-1">
-          {[{ value: null, label: "Any" }, { value: true, label: "Remote" }, { value: false, label: "On-site" }].map((opt) => (
+      <Separator className="bg-border/60" />
+
+      {/* Remote toggle - Segmented Control */}
+      <div className="space-y-2">
+        <label className="text-[11px] font-semibold tracking-wider text-muted-foreground/80 uppercase block">Remote</label>
+        <div className="flex rounded-lg bg-muted p-0.5 w-full">
+          {[
+            { value: null, label: "Any" },
+            { value: true, label: "Remote" },
+            { value: false, label: "On-site" }
+          ].map((opt) => (
             <button
               key={String(opt.value)}
               type="button"
               onClick={() => onChange({ ...filters, remote: opt.value })}
-              className={`rounded-md px-2.5 py-1 text-xs transition-colors ${
+              className={`flex-1 rounded-[6px] py-1 text-xs font-medium transition-all ${
                 filters.remote === opt.value
-                  ? "bg-primary text-primary-foreground"
-                  : "bg-muted text-muted-foreground hover:bg-muted/80"
+                  ? "bg-background text-foreground shadow-xs border border-border/40"
+                  : "text-muted-foreground hover:text-foreground bg-transparent border border-transparent"
               }`}
             >
               {opt.label}
@@ -135,29 +142,32 @@ export default function JobFilters({ filters, onChange, onReset }: JobFiltersPro
       </div>
 
       {/* Location */}
-      <div className="mb-3">
-        <label className="mb-1 block text-xs font-medium text-muted-foreground">Location</label>
-        <Input
-          placeholder="City or region..."
-          value={filters.location}
-          onChange={(e) => onChange({ ...filters, location: e.target.value })}
-          className="h-8 text-xs"
-        />
+      <div className="space-y-2">
+        <label className="text-[11px] font-semibold tracking-wider text-muted-foreground/80 uppercase block">Location</label>
+        <div className="relative">
+          <MapPin className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground/80" />
+          <Input
+            placeholder="City or region..."
+            value={filters.location}
+            onChange={(e) => onChange({ ...filters, location: e.target.value })}
+            className="h-9 pl-8 text-xs rounded-lg"
+          />
+        </div>
       </div>
 
       {/* Employment type */}
-      <div className="mb-3">
-        <label className="mb-1 block text-xs font-medium text-muted-foreground">Employment Type</label>
-        <div className="flex flex-wrap gap-1">
+      <div className="space-y-2">
+        <label className="text-[11px] font-semibold tracking-wider text-muted-foreground/80 uppercase block">Employment Type</label>
+        <div className="flex flex-wrap gap-1.5">
           {EMPLOYMENT_TYPES.map((opt) => (
             <button
               key={opt.value}
               type="button"
               onClick={() => toggleEmploymentType(opt.value)}
-              className={`rounded-md px-2.5 py-1 text-xs transition-colors ${
+              className={`rounded-full border px-3 py-1 text-xs transition-all duration-150 ${
                 filters.employment_type.includes(opt.value)
-                  ? "bg-primary text-primary-foreground"
-                  : "bg-muted text-muted-foreground hover:bg-muted/80"
+                  ? "border-primary bg-primary/10 text-primary font-medium"
+                  : "border-border bg-background/50 text-muted-foreground hover:border-muted-foreground/40 hover:text-foreground"
               }`}
             >
               {opt.label}
@@ -167,18 +177,18 @@ export default function JobFilters({ filters, onChange, onReset }: JobFiltersPro
       </div>
 
       {/* Experience level */}
-      <div className="mb-3">
-        <label className="mb-1 block text-xs font-medium text-muted-foreground">Experience</label>
-        <div className="flex flex-wrap gap-1">
+      <div className="space-y-2">
+        <label className="text-[11px] font-semibold tracking-wider text-muted-foreground/80 uppercase block">Experience</label>
+        <div className="flex flex-wrap gap-1.5">
           {EXPERIENCE_LEVELS.map((opt) => (
             <button
               key={opt.value}
               type="button"
               onClick={() => onChange({ ...filters, experience_level: opt.value })}
-              className={`rounded-md px-2.5 py-1 text-xs transition-colors ${
+              className={`rounded-full border px-3 py-1 text-xs transition-all duration-150 ${
                 filters.experience_level === opt.value
-                  ? "bg-primary text-primary-foreground"
-                  : "bg-muted text-muted-foreground hover:bg-muted/80"
+                  ? "border-primary bg-primary/10 text-primary font-medium"
+                  : "border-border bg-background/50 text-muted-foreground hover:border-muted-foreground/40 hover:text-foreground"
               }`}
             >
               {opt.label}
@@ -188,40 +198,46 @@ export default function JobFilters({ filters, onChange, onReset }: JobFiltersPro
       </div>
 
       {/* Salary range */}
-      <div className="mb-3">
-        <label className="mb-1 block text-xs font-medium text-muted-foreground">Salary Range</label>
+      <div className="space-y-2">
+        <label className="text-[11px] font-semibold tracking-wider text-muted-foreground/80 uppercase block">Salary Range</label>
         <div className="flex items-center gap-2">
-          <Input
-            placeholder="Min"
-            type="number"
-            value={filters.salary_min}
-            onChange={(e) => onChange({ ...filters, salary_min: e.target.value })}
-            className="h-8 text-xs"
-          />
-          <span className="text-xs text-muted-foreground">-</span>
-          <Input
-            placeholder="Max"
-            type="number"
-            value={filters.salary_max}
-            onChange={(e) => onChange({ ...filters, salary_max: e.target.value })}
-            className="h-8 text-xs"
-          />
+          <div className="relative flex-1">
+            <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs text-muted-foreground/60">$</span>
+            <Input
+              placeholder="Min"
+              type="number"
+              value={filters.salary_min}
+              onChange={(e) => onChange({ ...filters, salary_min: e.target.value })}
+              className="h-9 pl-5 text-xs rounded-lg"
+            />
+          </div>
+          <span className="text-xs text-muted-foreground/60">—</span>
+          <div className="relative flex-1">
+            <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs text-muted-foreground/60">$</span>
+            <Input
+              placeholder="Max"
+              type="number"
+              value={filters.salary_max}
+              onChange={(e) => onChange({ ...filters, salary_max: e.target.value })}
+              className="h-9 pl-5 text-xs rounded-lg"
+            />
+          </div>
         </div>
       </div>
 
       {/* Posted within */}
-      <div className="mb-3">
-        <label className="mb-1 block text-xs font-medium text-muted-foreground">Posted</label>
-        <div className="flex flex-wrap gap-1">
+      <div className="space-y-2">
+        <label className="text-[11px] font-semibold tracking-wider text-muted-foreground/80 uppercase block">Posted</label>
+        <div className="flex flex-wrap gap-1.5">
           {POSTED_OPTIONS.map((opt) => (
             <button
               key={opt.value}
               type="button"
               onClick={() => onChange({ ...filters, posted_within: opt.value })}
-              className={`rounded-md px-2.5 py-1 text-xs transition-colors ${
+              className={`rounded-full border px-3 py-1 text-xs transition-all duration-150 ${
                 filters.posted_within === opt.value
-                  ? "bg-primary text-primary-foreground"
-                  : "bg-muted text-muted-foreground hover:bg-muted/80"
+                  ? "border-primary bg-primary/10 text-primary font-medium"
+                  : "border-border bg-background/50 text-muted-foreground hover:border-muted-foreground/40 hover:text-foreground"
               }`}
             >
               {opt.label}
@@ -231,18 +247,18 @@ export default function JobFilters({ filters, onChange, onReset }: JobFiltersPro
       </div>
 
       {/* Source */}
-      <div className="mb-3">
-        <label className="mb-1 block text-xs font-medium text-muted-foreground">Source</label>
-        <div className="flex flex-wrap gap-1">
+      <div className="space-y-2">
+        <label className="text-[11px] font-semibold tracking-wider text-muted-foreground/80 uppercase block">Source</label>
+        <div className="flex flex-wrap gap-1.5">
           {SOURCES.map((opt) => (
             <button
               key={opt.value}
               type="button"
               onClick={() => onChange({ ...filters, source: opt.value })}
-              className={`rounded-md px-2.5 py-1 text-xs transition-colors ${
+              className={`rounded-full border px-3 py-1 text-xs transition-all duration-150 ${
                 filters.source === opt.value
-                  ? "bg-primary text-primary-foreground"
-                  : "bg-muted text-muted-foreground hover:bg-muted/80"
+                  ? "border-primary bg-primary/10 text-primary font-medium"
+                  : "border-border bg-background/50 text-muted-foreground hover:border-muted-foreground/40 hover:text-foreground"
               }`}
             >
               {opt.label}
@@ -251,19 +267,19 @@ export default function JobFilters({ filters, onChange, onReset }: JobFiltersPro
         </div>
       </div>
 
-      {/* Sort */}
-      <div>
-        <label className="mb-1 block text-xs font-medium text-muted-foreground">Sort By</label>
-        <div className="flex flex-wrap gap-1">
+      {/* Sort - Segmented Control */}
+      <div className="space-y-2">
+        <label className="text-[11px] font-semibold tracking-wider text-muted-foreground/80 uppercase block">Sort By</label>
+        <div className="flex rounded-lg bg-muted p-0.5 w-full">
           {SORT_OPTIONS.map((opt) => (
             <button
               key={opt.value}
               type="button"
               onClick={() => onChange({ ...filters, sort: opt.value })}
-              className={`rounded-md px-2.5 py-1 text-xs transition-colors ${
+              className={`flex-1 rounded-[6px] py-1.5 text-xs font-medium transition-all ${
                 filters.sort === opt.value
-                  ? "bg-primary text-primary-foreground"
-                  : "bg-muted text-muted-foreground hover:bg-muted/80"
+                  ? "bg-background text-foreground shadow-xs border border-border/40"
+                  : "text-muted-foreground hover:text-foreground bg-transparent border border-transparent"
               }`}
             >
               {opt.label}
