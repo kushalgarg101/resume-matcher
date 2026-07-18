@@ -127,6 +127,8 @@ def test_hs256_wrong_issuer_rejected(override_settings):
 
 
 def test_es256_jwks_verification(override_settings):
+    import time
+
     private_pem, jwk = _rsa_keypair()
     override_settings(
         supabase_url="https://example.supabase.co",
@@ -145,20 +147,10 @@ def test_es256_jwks_verification(override_settings):
         headers={"kid": "test-kid"},
     )
 
-    class _FakeJWKClient:
-        def __init__(self, *args, **kwargs):
-            pass
-
-        def get_signing_key_from_jwt(self, _t):
-            from jwt import PyJWK
-
-            return PyJWK.from_dict(jwk)
-
     with pytest.MonkeyPatch().context() as mp:
-        mp.setattr(jwt_verify, "_jwks_client", lambda: _FakeJWKClient())
+        mp.setattr(jwt_verify, "_fetch_jwks", lambda _issuer: {"keys": [jwk]})
         claims = verify_supabase_jwt(token)
     assert claims["sub"] == "uid"
-
 
 def test_unsupported_algorithm_rejected(override_settings):
     secret = "jwt-secret-at-least-32-bytes-long-xxxxxxxxx"

@@ -18,7 +18,9 @@ def test_get_user_client_attaches_bearer_header(override_settings):
         get_user_client("my.jwt.token")
     # create_client called with the token in the options headers.
     _, kwargs = factory.call_args
-    assert kwargs["options"]["headers"]["Authorization"] == "Bearer my.jwt.token"
+    opts = kwargs.get("options")
+    assert opts is not None
+    assert opts.headers["Authorization"] == "Bearer my.jwt.token"
 
 
 def test_get_admin_client_uses_service_key(override_settings):

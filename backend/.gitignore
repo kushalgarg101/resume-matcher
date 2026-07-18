@@ -15,6 +15,9 @@ venv/
 .coverage
 htmlcov/
 
+# ---- Logs ----
+*.log
+
 # ---- Editor / OS ----
 .vscode/
 .idea/

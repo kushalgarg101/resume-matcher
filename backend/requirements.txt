@@ -11,6 +11,10 @@ supabase>=2.5
 # re-testing the enqueue path.
 redis>=5.0,<6.0
 rq>=1.16,<2.0
+# click 8.2+ warns (and may error in future) about rq 1.16 registering the
+# `--serializer`/`-S` CLI option twice. Pin to 8.1.x to keep the `rq worker`
+# startup output clean on local dev and in the Render worker container.
+click>=8.1,<8.2
 groq>=0.9
 pdfminer.six>=20240706
 python-dotenv>=1.0
@@ -19,3 +23,5 @@ PyJWT>=2.8
 cryptography>=42.0
 requests>=2.31
 python-multipart>=0.0.9
+# RSS job feed parsing
+feedparser>=6.0

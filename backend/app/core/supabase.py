@@ -19,6 +19,7 @@ from __future__ import annotations
 from functools import lru_cache
 
 from supabase import Client, create_client
+from supabase.lib.client_options import SyncClientOptions
 
 from app.core.config import get_settings
 
@@ -45,9 +46,12 @@ def get_user_client(access_token: str) -> Client:
     because the auth header is request-specific.
     """
     settings = get_settings()
+    options = SyncClientOptions(
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
     client = create_client(
         settings.supabase_url,
         settings.supabase_anon_key,
-        options={"headers": {"Authorization": f"Bearer {access_token}"}},
+        options=options,
     )
     return client

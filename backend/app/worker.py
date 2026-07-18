@@ -34,6 +34,8 @@ from rq import get_current_job
 from app.core.config import get_settings
 from app.core.supabase import get_admin_client
 from app.services.matcher import run_match
+from app.services.pdf_extract import extract_pdf_text
+from app.services.profile_extraction import extract_profile
 from app.services.storage import delete_resume, download_resume
 
 
@@ -122,7 +124,7 @@ def process_analysis(*, analysis_id: str, storage_path: str, jd_text: str) -> di
     # Guard against double-processing. RQ may redeliver a job after a worker
     # crash; if a previous attempt already finalised the row, skip it.
     current = (
-        admin.table("analyses").select("status").eq("id", analysis_id).execute()
+        admin.table("analyses").select("status, user_id").eq("id", analysis_id).execute()
     )
     if getattr(current, "error", None):
         # Could not read current status; proceed and let the claim/update below
@@ -133,7 +135,7 @@ def process_analysis(*, analysis_id: str, storage_path: str, jd_text: str) -> di
         # insert was rolled back). Don't crash the worker — just skip. There is
         # nothing to update and no PDF to process.
         return {"status": "missing", "skipped": True}
-    existing_status = current.data[0]["status"]
+    existing_status = current.data[0].get("status", "unknown")
     if existing_status in ("completed", "failed"):
         # Already finalised by a prior attempt; nothing to do.
         return {"status": existing_status, "skipped": True}
@@ -160,6 +162,39 @@ def process_analysis(*, analysis_id: str, storage_path: str, jd_text: str) -> di
             return {"status": "processing", "skipped": True}
         pdf_bytes = download_resume(storage_path=storage_path)
         result = run_match(pdf_bytes=pdf_bytes, jd_text=jd_text)
+
+        # Extract profile from resume (best-effort, non-blocking).
+        # Only fills fields that are empty/null in the existing profile so
+        # user edits (via chat or form) are never overwritten.
+        try:
+            resume_text = extract_pdf_text(pdf_bytes)
+            if resume_text:
+                extracted = extract_profile(resume_text)
+                user_id = current.data[0].get("user_id") if current.data else None
+                if user_id:
+                    existing = (
+                        admin.table("user_profiles")
+                        .select("*")
+                        .eq("user_id", user_id)
+                        .execute()
+                    )
+                    existing_row = existing.data[0] if (not getattr(existing, "error", None) and existing.data) else None
+                    if existing_row:
+                        profile_data = {"updated_at": _utcnow()}
+                        for key, value in extracted.items():
+                            current_val = existing_row.get(key)
+                            if current_val is None or current_val == [] or current_val == "" or current_val == {}:
+                                profile_data[key] = value
+                        update_res = admin.table("user_profiles").update(profile_data).eq("user_id", user_id).execute()
+                        if getattr(update_res, "error", None):
+                            traceback.print_exc()
+                    else:
+                        profile_data = {**extracted, "user_id": user_id, "updated_at": _utcnow()}
+                        insert_res = admin.table("user_profiles").insert(profile_data).execute()
+                        if getattr(insert_res, "error", None):
+                            traceback.print_exc()
+        except Exception:
+            traceback.print_exc()
         # Cap stored JSON size as a defence against unexpectedly large payloads.
         result_json = result.model_dump()
         encoded = json.dumps(result_json)

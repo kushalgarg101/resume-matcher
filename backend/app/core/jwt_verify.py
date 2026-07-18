@@ -25,10 +25,14 @@ Credentials refresh (RS256/ES256 public keys) is fetched lazily and cached by
 
 from __future__ import annotations
 
+import gzip
+import json
+import urllib.request
 from typing import Any
 
 import jwt
-from jwt import PyJWKClient, PyJWTError
+from jwt import PyJWTError
+from jwt.algorithms import ECAlgorithm, RSAAlgorithm, Algorithm
 
 from app.core.config import get_settings
 
@@ -46,42 +50,65 @@ def _normalise_issuer(supabase_url: str) -> str:
     return f"{base}/auth/v1"
 
 
-# Cache the JWKS client per issuer URL so the `kid` key cache is shared across
-# requests (a fresh client per call would re-fetch the JWKS document each time).
-_jwks_clients: dict[str, PyJWKClient] = {}
+# Cache fetched JWKS keys per issuer URL keyed by `kid`. PyJWT's PyJWKClient
+# fetches the JWKS with urllib and calls json.load() on the raw response, which
+# fails when the endpoint returns gzip-compressed bytes (UnicodeDecodeError on
+# the gzip magic byte). We fetch + decompress the JWKS ourselves instead.
+_jwks_cache: dict[str, dict[str, Any]] = {}
 
 
-def _jwks_client() -> PyJWKClient:
-    """Return a (cached) PyJWKClient for the project's JWKS endpoint."""
-    settings = get_settings()
-    jwks_url = f"{_normalise_issuer(settings.supabase_url)}/.well-known/jwks.json"
-    cached = _jwks_clients.get(jwks_url)
-    if cached is None:
-        # cache_keys=True keeps fetched keys in memory keyed by kid. We attach a
-        # requests.Session with an explicit timeout so a slow/hung JWKS endpoint
-        # cannot block the request thread indefinitely (availability guard).
-        import requests
+def _fetch_jwks(issuer: str) -> dict[str, Any]:
+    """Fetch and (if needed) gunzip the project's JWKS document.
 
-        session = requests.Session()
-        session.headers.update({"User-Agent": "resume-matcher-api"})
-        cached = PyJWKClient(
-            jwks_url,
-            cache_keys=True,
-            lifespan=600,
-            headers=session.headers,
-            timeout=10,
-        )
-        _jwks_clients[jwks_url] = cached
-    return cached
+    Cached in-memory for the process lifetime (keys rarely rotate; the Supabase
+    JWKS only changes on signing-key rotation). A gzip-compressed response is
+    transparently decompressed so json parsing always sees plain JSON.
+    """
+    jwks_url = f"{issuer}/.well-known/jwks.json"
+    cached = _jwks_cache.get(jwks_url)
+    if cached is not None:
+        return cached
+
+    req = urllib.request.Request(
+        jwks_url,
+        headers={"User-Agent": "resume-matcher-api", "Accept-Encoding": "gzip"},
+    )
+    with urllib.request.urlopen(req, timeout=10) as resp:
+        raw = resp.read()
+        # The response may arrive gzip-compressed even with no Accept-Encoding
+        # hint, or because the server always gzips. Detect + decompress.
+        if raw[:2] == b"\x1f\x8b":
+            raw = gzip.decompress(raw)
+        jwks = json.loads(raw.decode("utf-8"))
+
+    _jwks_cache[jwks_url] = jwks
+    return jwks
 
 
 def _verify_asymmetric(token: str, issuer: str) -> dict[str, Any]:
     """Verify an ES256/RS256 token using the project's published JWKS keys."""
-    client = _jwks_client()
-    signing_key = client.get_signing_key_from_jwt(token)
+    header = jwt.get_unverified_header(token)
+    kid = header.get("kid")
+    if not kid:
+        raise jwt.InvalidTokenError("JWT missing 'kid' header for asymmetric verification.")
+
+    jwks = _fetch_jwks(issuer)
+    key_dict = next((k for k in jwks.get("keys", []) if k.get("kid") == kid), None)
+    if key_dict is None:
+        raise jwt.InvalidTokenError(f"No JWKS key found for kid={kid!r}.")
+
+    kty = key_dict.get("kty")
+    algo_cls: type[Algorithm]
+    if kty == "RSA":
+        algo_cls = RSAAlgorithm
+    elif kty == "EC":
+        algo_cls = ECAlgorithm
+    else:
+        raise jwt.InvalidTokenError(f"Unsupported JWKS key type: {kty!r}.")
+    public_key = algo_cls.from_jwk(json.dumps(key_dict))
     return jwt.decode(
         token,
-        signing_key.key,
+        public_key,
         algorithms=["ES256", "RS256"],
         issuer=issuer,
         audience=list(_EXPECTED_AUDIENCES),

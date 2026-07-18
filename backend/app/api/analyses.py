@@ -24,7 +24,6 @@ import traceback
 import uuid
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, status, UploadFile
-from fastapi.security import HTTPBearer
 from rq import Retry
 
 from app.api.auth import get_current_user
@@ -36,8 +35,6 @@ from app.services.storage import StorageError, delete_resume, upload_resume
 from app.worker import process_analysis  # the RQ task
 
 router = APIRouter(prefix="/api/analyses", tags=["Analyses"])
-
-_bearer = HTTPBearer(auto_error=False)
 
 
 def _token_from_request(request: Request) -> str:
@@ -97,9 +94,9 @@ def _row_to_out(row: dict) -> AnalysisOut:
         except Exception:  # noqa: BLE001 - corrupt stored payload
             result = None
     return AnalysisOut(
-        id=row["id"],
-        filename=row["filename"],
-        status=row["status"],
+        id=row.get("id", ""),
+        filename=row.get("filename", ""),
+        status=row.get("status", "unknown"),
         result=result,
         error_message=row.get("error_message"),
         created_at=row.get("created_at"),

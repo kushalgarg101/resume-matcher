@@ -79,6 +79,11 @@ class Settings(BaseSettings):
     # know it. Left blank in local dev disables auth on /internal/* (dev only).
     internal_api_key: str = ""
 
+    # Job source API keys
+    jooble_api_key: str = ""
+    adzuna_app_id: str = ""
+    adzuna_api_key: str = ""
+
 
 # Module-level override slot. When set (by tests via `set_settings`), every
 # call to `get_settings()` returns this instance instead of building a new one.

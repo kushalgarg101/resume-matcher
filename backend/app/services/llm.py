@@ -211,6 +211,8 @@ def score_match(*, resume_text: str, jd_text: str) -> MatchResult:
     for attempt in range(1, settings.groq_max_retries + 1):
         try:
             response = _try_with_json_fallback(client, settings, user_prompt)
+            if not response.choices:
+                raise ValueError("LLM response contained no choices.")
             content = response.choices[0].message.content or ""
             return _normalise(_extract_json_object(content))
         except APIStatusError as exc:

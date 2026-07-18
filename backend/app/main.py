@@ -8,6 +8,8 @@ cron jobs keep the service warm.
 
 from __future__ import annotations
 
+import asyncio
+import traceback
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -17,19 +19,25 @@ from app.api.health import router as health_router
 from app.core.config import cors_origins_list, get_settings
 
 
+_PERIODIC_SYNC_INTERVAL = 6 * 3600  # 6 hours
+
+
+async def _periodic_sync():
+    """Run job sync every 6 hours in the background."""
+    while True:
+        await asyncio.sleep(_PERIODIC_SYNC_INTERVAL)
+        try:
+            from app.jobs.sync import sync_all_sources
+
+            result = await asyncio.to_thread(sync_all_sources)
+            print(f"[periodic_sync] new={result.new} updated={result.updated} errors={len(result.errors)}")
+        except Exception:
+            traceback.print_exc()
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Fail fast on missing required configuration. Without these the service is
-    # non-functional (every request 401s, or the frontend is blocked by CORS),
-    # so it is better to crash at boot where Render surfaces the error clearly
-    # than to silently serve a broken API.
     settings = get_settings()
-    # NOTE: SUPABASE_JWT_SECRET is intentionally NOT required here. Newer
-    # Supabase projects use asymmetric "JWT Signing Keys" (ES256/RS256) and
-    # verify tokens via the published JWKS endpoint instead — in that case the
-    # legacy JWT secret is empty and the service must still boot. The runtime
-    # verifier (`app.core.jwt_verify`) rejects an HS256 token only when the
-    # secret is missing, so there is nothing to fail-fast on at boot.
     missing = [
         name
         for name, val in (
@@ -48,12 +56,22 @@ async def lifespan(app: FastAPI):
             "Refusing to start: missing required configuration: "
             + ", ".join(missing)
         )
-    # Surface which JWT verification path is active (informational only).
+
     if settings.supabase_jwt_secret:
         print("JWT verification: HS256 (SUPABASE_JWT_SECRET) + JWKS fallback")
     else:
         print("JWT verification: JWKS (asymmetric ES256/RS256) only")
+
+    sync_task = asyncio.create_task(_periodic_sync())
+    print(f"[periodic_sync] scheduled every {_PERIODIC_SYNC_INTERVAL // 3600}h")
+
     yield
+
+    sync_task.cancel()
+    try:
+        await sync_task
+    except asyncio.CancelledError:
+        pass
 
 
 def create_app() -> FastAPI:
@@ -81,11 +99,26 @@ def create_app() -> FastAPI:
     from app.api.analyses import router as analyses_router
 
     app.include_router(analyses_router)
-    # Analyses router is mounted in Phase 4 (after services exist).
 
     from app.api.internal import router as internal_router
 
     app.include_router(internal_router)
+
+    from app.api.profiles import router as profiles_router
+
+    app.include_router(profiles_router)
+
+    from app.api.chat import router as chat_router
+
+    app.include_router(chat_router)
+
+    from app.api.jobs import router as jobs_router
+
+    app.include_router(jobs_router)
+
+    from app.api.applications import router as applications_router
+
+    app.include_router(applications_router)
 
     return app
 
