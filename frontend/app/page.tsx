@@ -59,7 +59,7 @@ export default function HomePage() {
   return (
     <div className="container animate-fade-in py-10">
       {/* Hero */}
-      <section className="rounded-2xl border-x border-b border-border bg-gradient-to-br from-primary/10 via-card to-card p-8 text-center sm:p-12">
+      <section className="rounded-2xl border border-border bg-gradient-to-br from-primary/10 via-card to-card p-8 text-center sm:p-12">
         <span className="inline-flex items-center gap-1.5 rounded-full border border-primary/30 bg-primary/10 px-3 py-1 text-xs font-medium text-primary">
           <Sparkles className="h-3 w-3" />
           AI-powered resume scoring
