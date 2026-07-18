@@ -51,10 +51,8 @@ services:
     name: resume-matcher-worker
     runtime: docker
     rootDir: backend
-    dockerfilePath: ./Dockerfile
+    dockerfilePath: ./Dockerfile.worker
     plan: free
-    # Override the Dockerfile CMD to run the RQ worker instead of the API.
-    startCommand: rq worker default --url $REDIS_URL
     envVars:
       - key: REDIS_URL
         fromService:
