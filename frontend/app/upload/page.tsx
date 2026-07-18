@@ -2,8 +2,17 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { FileText } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { createAnalysis, getAnalysis, Analysis, ApiError } from "@/lib/api";
+import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Card, CardContent } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
+import FileDropzone from "@/components/FileDropzone";
+import EmptyState from "@/components/EmptyState";
 import ResultCard from "@/components/ResultCard";
 
 export default function UploadPage() {
@@ -14,8 +23,6 @@ export default function UploadPage() {
   const [analysis, setAnalysis] = useState<Analysis | null>(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
-  // Lets the polling loop bail out if the component unmounts (e.g. user
-  // navigates away) so we never setState on an unmounted component.
   const cancelledRef = useRef(false);
 
   useEffect(() => {
@@ -25,18 +32,13 @@ export default function UploadPage() {
     };
   }, []);
 
-  if (!loading && !user) {
-    router.replace("/login");
-    return null;
-  }
+  useEffect(() => {
+    if (!loading && !user) router.replace("/login");
+  }, [loading, user, router]);
+
+  if (loading || !user) return null;
 
   const poll = async (id: string) => {
-    // The worker job has a generous timeout (job_timeout=600s on the backend,
-    // plus up to 2 RQ retries with 10s intervals), so a slow run on the free
-    // tier (worker cold-start + several LLM attempts + backoff) can take several
-    // minutes. Poll for ~5 min so a valid-but-slow job completes in-poll rather
-    // than bailing early; the History page also auto-refreshes in-progress rows
-    // as a fallback.
     for (let i = 0; i < 150; i++) {
       if (cancelledRef.current) return;
       await new Promise((r) => setTimeout(r, 2000));
@@ -45,7 +47,6 @@ export default function UploadPage() {
       try {
         a = await getAnalysis(id);
       } catch (err) {
-        // Stop polling on auth failure or hard errors; surface to the user.
         if (err instanceof ApiError && (err.status === 401 || err.status === 404)) {
           if (err.status === 401) {
             setError("Session expired. Please sign in again.");
@@ -91,22 +92,86 @@ export default function UploadPage() {
   };
 
   return (
-    <main className="container">
-      <div className="card">
-        <a href="/">← Back</a>
-        <h1>New analysis</h1>
-        <form onSubmit={submit}>
-          <label>Job description</label>
-          <textarea rows={6} value={jdText} onChange={(e) => setJdText(e.target.value)} required />
-          <label>Resume (PDF)</label>
-          <input type="file" accept="application/pdf" onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
-          <button disabled={busy} style={{ marginTop: "1rem" }}>
-            {busy ? "Processing…" : "Score match"}
-          </button>
-        </form>
-        {error && <p className="error">{error}</p>}
+    <div className="container animate-fade-in py-8">
+      <div className="mb-6 ml-2">
+        <Link href="/" className="text-sm text-muted-foreground hover:text-foreground">
+          ← Back
+        </Link>
+        <h1 className="mt-2 text-2xl font-bold tracking-tight">New analysis</h1>
+        <p className="text-sm text-muted-foreground">
+          Paste a job description and upload your resume to get a match score.
+        </p>
       </div>
-      {analysis && <ResultCard analysis={analysis} />}
-    </main>
+
+      <div className="grid gap-6 lg:grid-cols-5">
+        {/* Left: input form */}
+        <div className="lg:col-span-3">
+          <form onSubmit={submit}>
+            <Card>
+              <CardContent className="space-y-5 p-6">
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="jd">Job description</Label>
+                    <span className="text-xs text-muted-foreground">
+                      {jdText.length}/20000
+                    </span>
+                  </div>
+                  <Textarea
+                    id="jd"
+                    rows={8}
+                    placeholder="Paste the job description here…"
+                    value={jdText}
+                    onChange={(e) => setJdText(e.target.value)}
+                    required
+                    className="resize-none"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="resume">Resume (PDF)</Label>
+                  <FileDropzone file={file} onFileChange={setFile} />
+                </div>
+
+                {error && (
+                  <p className="text-sm text-destructive">{error}</p>
+                )}
+
+                <Button
+                  type="submit"
+                  size="lg"
+                  disabled={busy}
+                  className="w-full"
+                >
+                  {busy ? "Processing…" : "Score match"}
+                </Button>
+              </CardContent>
+            </Card>
+          </form>
+        </div>
+
+        {/* Right: live result */}
+        <div className="lg:col-span-2">
+          {analysis ? (
+            <ResultCard analysis={analysis} />
+          ) : busy ? (
+            <Card>
+              <CardContent className="space-y-4 p-6">
+                <Skeleton className="h-6 w-32" />
+                <Skeleton className="h-32 w-32 rounded-full" />
+                <Skeleton className="h-4 w-full" />
+                <Skeleton className="h-4 w-3/4" />
+              </CardContent>
+            </Card>
+          ) : (
+            <EmptyState
+              icon={<FileText className="h-6 w-6" />}
+              title="No result yet"
+              description="Your match score and skill breakdown will appear here once you run an analysis."
+              className="h-full"
+            />
+          )}
+        </div>
+      </div>
+    </div>
   );
 }
