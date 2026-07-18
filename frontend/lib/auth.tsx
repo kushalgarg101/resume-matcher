@@ -1,7 +1,3 @@
-/**
- * Auth context: exposes the current Supabase user and sign-in/out helpers.
- * Wrap the app in <AuthProvider> and consume with useAuth().
- */
 "use client";
 
 import {
@@ -11,7 +7,7 @@ import {
   useState,
   ReactNode,
 } from "react";
-import { Session, User } from "@supabase/supabase-js";
+import { User } from "@supabase/supabase-js";
 import { supabase } from "./supabase";
 
 interface AuthContextValue {
@@ -20,6 +16,7 @@ interface AuthContextValue {
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
+  resetPassword: (email: string) => Promise<void>;
 }
 
 /** Thrown by signUp when Supabase requires email confirmation before login. */
@@ -55,9 +52,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signUp = async (email: string, password: string) => {
     const { data, error } = await supabase.auth.signUp({ email, password });
     if (error) throw error;
-    // Supabase's default "Confirm email" flow returns a user without a session.
-    // Tell the caller so the UI can show a "check your inbox" message instead of
-    // redirecting into the app (which would bounce back to /login).
     if (data.session === null) {
       throw new EmailConfirmationRequiredError();
     }
@@ -67,8 +61,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await supabase.auth.signOut();
   };
 
+  const resetPassword = async (email: string) => {
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${window.location.origin}/auth/callback`,
+    });
+    if (error) throw error;
+  };
+
   return (
-    <AuthContext.Provider value={{ user, loading, signIn, signUp, signOut }}>
+    <AuthContext.Provider value={{ user, loading, signIn, signUp, signOut, resetPassword }}>
       {children}
     </AuthContext.Provider>
   );

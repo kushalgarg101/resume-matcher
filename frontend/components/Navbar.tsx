@@ -22,7 +22,7 @@ export default function Navbar() {
   const initial = user?.email?.[0]?.toUpperCase() ?? "U";
 
   return (
-    <header className="sticky top-0 z-40 w-full bg-background/80 backdrop-blur-lg">
+    <header className="sticky top-0 z-40 w-full border-b border-border/60 bg-background/80 backdrop-blur-lg">
       <div className="container flex h-16 items-center justify-between">
         <Link href="/" className="flex items-center gap-2 group">
           <span className="relative flex h-7 w-7 items-center justify-center rounded-lg bg-primary/15 text-primary transition-transform group-hover:scale-105">
