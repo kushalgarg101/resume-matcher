@@ -3,7 +3,7 @@
 
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { Loader2, Search, Briefcase, ArrowLeft, ExternalLink, MapPin, Building2, BookmarkCheck, Bookmark, Calendar, FileText, X, SlidersHorizontal } from "lucide-react";
+import { Loader2, Search, Briefcase, ArrowLeft, ExternalLink, MapPin, Building2, BookmarkCheck, Bookmark, Calendar, FileText, X, SlidersHorizontal, Sparkles } from "lucide-react";
 import { marked } from "marked";
 import { useAuth } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
@@ -12,7 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import JobCard from "@/components/JobCard";
 import JobFilters, { DEFAULT_FILTERS, type JobFilterValues } from "@/components/JobFilters";
-import { listJobs, listSavedJobs, saveJob, unsaveJob, getJobMatch, generateCoverLetter, Job, JobMatchResult, ApiError } from "@/lib/api";
+import { listJobs, listSavedJobs, saveJob, unsaveJob, getJobMatch, generateCoverLetter, Job, JobMatchResult, ApiError, createPlan, tailorResume, SearchPlan } from "@/lib/api";
 
 export default function JobsPage() {
   const { user, loading: authLoading } = useAuth();
@@ -37,6 +37,9 @@ export default function JobsPage() {
   const [error, setError] = useState("");
   const [showFilters, setShowFilters] = useState(true);
   const [copied, setCopied] = useState(false);
+  const [plannerQuery, setPlannerQuery] = useState("");
+  const [planning, setPlanning] = useState(false);
+  const [planResult, setPlanResult] = useState<SearchPlan | null>(null);
   const perPage = 20;
 
   const debounceRef = useRef<ReturnType<typeof setTimeout>>();
@@ -164,6 +167,23 @@ export default function JobsPage() {
     setTimeout(() => setCopied(false), 2000);
   };
 
+  const handlePlanSearch = async () => {
+    if (!plannerQuery.trim()) return;
+    setPlanning(true);
+    setPlanResult(null);
+    try {
+      const res = await createPlan(plannerQuery);
+      setPlanResult(res.search_plan);
+      const f: Partial<JobFilterValues> = {};
+      if (res.search_plan.roles?.length) f.q = res.search_plan.roles[0];
+      if (res.search_plan.location) f.location = res.search_plan.location;
+      if (res.search_plan.remote !== null && res.search_plan.remote !== undefined) f.remote = res.search_plan.remote;
+      if (res.search_plan.employment_type) f.employment_type = [res.search_plan.employment_type];
+      if (res.search_plan.experience_level) f.experience_level = res.search_plan.experience_level;
+      setFilters((prev) => ({ ...prev, ...f }));
+    } catch { setError("Failed to create search plan."); } finally { setPlanning(false); }
+  };
+
   if (authLoading) return <div className="flex min-h-[60vh] items-center justify-center"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>;
   if (!user) return null;
 
@@ -189,22 +209,71 @@ export default function JobsPage() {
       </div>
 
       {!showSaved && (
-        <div className="mb-6 flex gap-2">
-          <div className="relative flex-1">
-            <Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground/80" />
-            <Input
-              value={filters.q}
-              onChange={(e) => setFilters((prev) => ({ ...prev, q: e.target.value }))}
-              placeholder="Search jobs by title, company, or keywords..."
-              className="pl-10 h-10 rounded-xl bg-card/50 border-border/80 focus:bg-card transition-all"
-            />
-          </div>
-          {filters.q && (
-            <Button variant="ghost" size="icon" className="h-10 w-10 rounded-xl" onClick={() => setFilters((prev) => ({ ...prev, q: "" }))}>
-              <X className="h-4 w-4" />
+        <>
+          <div className="mb-4 flex gap-2">
+            <div className="relative flex-1">
+              <Sparkles className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground/60" />
+              <Input
+                value={plannerQuery}
+                onChange={(e) => setPlannerQuery(e.target.value)}
+                placeholder='e.g. "backend engineer jobs in Bangalore over 15 LPA"'
+                className="pl-10 h-10 rounded-xl bg-card/50 border-border/80 focus:bg-card transition-all"
+                onKeyDown={(e) => e.key === "Enter" && handlePlanSearch()}
+              />
+            </div>
+            <Button
+              variant="default"
+              size="sm"
+              className="rounded-xl h-10 shrink-0"
+              onClick={handlePlanSearch}
+              disabled={planning || !plannerQuery.trim()}
+            >
+              {planning ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Sparkles className="mr-1.5 h-4 w-4" />}
+              Plan
             </Button>
+          </div>
+
+          {planResult && (
+            <div className="mb-4 flex flex-wrap items-center gap-2 rounded-xl border border-primary/20 bg-primary/5 px-4 py-2.5 text-xs">
+              <span className="font-semibold text-primary uppercase tracking-wider">Plan:</span>
+              {planResult.roles?.slice(0, 3).map((r) => (
+                <Badge key={r} variant="secondary" className="bg-primary/10 text-primary border-0 rounded-full">{r}</Badge>
+              ))}
+              {planResult.location && (
+                <span className="flex items-center gap-1 text-muted-foreground"><MapPin className="h-3 w-3" />{planResult.location}</span>
+              )}
+              {planResult.salary_min != null && (
+                <span className="text-muted-foreground/80">Min: ₹{(planResult.salary_min / 100000).toFixed(1)}L</span>
+              )}
+              {planResult.remote === true && <Badge variant="secondary" className="bg-green-500/10 text-green-600 border-0 rounded-full">Remote</Badge>}
+              {planResult.employment_type && <span className="text-muted-foreground/80 capitalize">{planResult.employment_type}</span>}
+              {planResult.experience_level && <span className="text-muted-foreground/80 capitalize">{planResult.experience_level}</span>}
+              <button
+                onClick={() => setPlanResult(null)}
+                className="ml-auto text-muted-foreground hover:text-foreground transition-colors"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            </div>
           )}
-        </div>
+
+          <div className="mb-6 flex gap-2">
+            <div className="relative flex-1">
+              <Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground/80" />
+              <Input
+                value={filters.q}
+                onChange={(e) => setFilters((prev) => ({ ...prev, q: e.target.value }))}
+                placeholder="Search jobs by title, company, or keywords..."
+                className="pl-10 h-10 rounded-xl bg-card/50 border-border/80 focus:bg-card transition-all"
+              />
+            </div>
+            {filters.q && (
+              <Button variant="ghost" size="icon" className="h-10 w-10 rounded-xl" onClick={() => setFilters((prev) => ({ ...prev, q: "" }))}>
+                <X className="h-4 w-4" />
+              </Button>
+            )}
+          </div>
+        </>
       )}
 
       {error && <p className="mb-6 text-sm text-destructive">{error}</p>}

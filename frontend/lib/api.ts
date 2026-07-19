@@ -388,6 +388,9 @@ export interface Application {
   status: "draft" | "applied" | "interviewing" | "offer" | "rejected" | "withdrawn";
   cover_letter?: string | null;
   notes?: string | null;
+  tailored_resume_url?: string | null;
+  email_thread_id?: string | null;
+  match_score?: number | null;
   applied_at?: string | null;
   created_at?: string | null;
   updated_at?: string | null;
@@ -423,4 +426,70 @@ export async function updateApplication(id: string, data: Partial<Application>):
   });
   if (!res.ok) throw new ApiError(res.status, `Update application failed (${res.status})`);
   return res.json();
+}
+
+// ── Planner ─────────────────────────────────────────────────────────────────
+
+export interface SearchPlan {
+  roles: string[];
+  location?: string | null;
+  salary_min?: number | null;
+  salary_max?: number | null;
+  remote?: boolean | null;
+  employment_type?: string | null;
+  experience_level?: string | null;
+  max_applications: number;
+}
+
+export interface PlannerResponse {
+  search_plan: SearchPlan;
+  suggestions: string[];
+}
+
+export async function createPlan(query: string): Promise<PlannerResponse> {
+  const res = await fetch(apiUrl("/api/planner/plan"), {
+    method: "POST",
+    headers: { ...(await authHeaders()), "Content-Type": "application/json" },
+    body: JSON.stringify({ query }),
+  });
+  if (!res.ok) throw new ApiError(res.status, `Planner failed (${res.status})`);
+  return res.json();
+}
+
+// ── Resume Tailor ───────────────────────────────────────────────────────────
+
+export interface OptimizedResume {
+  id: string;
+  job_id: string;
+  storage_path: string;
+  summary?: string | null;
+  skills: string[];
+  created_at?: string | null;
+}
+
+export interface TailorResumeResponse {
+  optimized_resume: OptimizedResume;
+  tailored_profile: Record<string, unknown>;
+}
+
+export async function tailorResume(jobId: string): Promise<TailorResumeResponse> {
+  const res = await fetch(apiUrl("/api/resume/tailor"), {
+    method: "POST",
+    headers: { ...(await authHeaders()), "Content-Type": "application/json" },
+    body: JSON.stringify({ job_id: jobId }),
+  });
+  if (!res.ok) throw new ApiError(res.status, `Resume tailor failed (${res.status})`);
+  return res.json();
+}
+
+export async function getTailoredResume(jobId: string): Promise<OptimizedResume | null> {
+  const res = await fetch(apiUrl(`/api/resume/tailor/${jobId}`), {
+    headers: await authHeaders(),
+  });
+  if (!res.ok) {
+    if (res.status === 404) return null;
+    throw new ApiError(res.status, `Get tailored resume failed (${res.status})`);
+  }
+  const data = await res.json();
+  return data as OptimizedResume | null;
 }
