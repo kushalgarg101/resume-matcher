@@ -65,6 +65,7 @@ export default function AutoApplyPage() {
     setError("");
     setJobs([]);
     setSelectedIds(new Set());
+    setRankAttempted(false);
     try {
       const res = await createPlan(query);
       setPlanResult(res.search_plan);

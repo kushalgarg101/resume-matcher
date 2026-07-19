@@ -93,7 +93,7 @@ def fetch_recent_emails(
         ids = message_ids[0].split() if message_ids[0] else []
         for mid in ids[-50:]:  # Process max 50 most recent emails
             status, msg_data = conn.fetch(mid, "(RFC822)")
-            if status != "OK":
+            if status != "OK" or not msg_data or not msg_data[0]:
                 continue
 
             raw_email = msg_data[0][1]

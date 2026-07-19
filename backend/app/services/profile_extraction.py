@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import time
 from typing import Any
 
 from groq import Groq
@@ -98,7 +99,6 @@ def extract_profile(resume_text: str) -> dict[str, Any]:
 
         except Exception as exc:
             if attempt < settings.groq_max_retries:
-                import time
                 time.sleep(min(2 ** (attempt - 1), 10.0))
                 continue
             raise LLMError(f"Profile extraction failed: {exc}") from exc
