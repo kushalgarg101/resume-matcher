@@ -305,3 +305,36 @@ create policy "applications_update_own"
 create policy "applications_delete_own"
     on public.applications for delete
     using (auth.uid() = user_id);
+
+-- ── Phase 4: Optimized resumes + application extensions ─────────────────────
+
+create table if not exists public.optimized_resumes (
+    id              uuid primary key default gen_random_uuid(),
+    user_id         uuid not null references public.profiles (id) on delete cascade,
+    job_id          uuid not null references public.jobs (id) on delete cascade,
+    storage_path    text not null,
+    summary         text,
+    skills          text[],
+    created_at      timestamptz not null default now(),
+    unique (user_id, job_id)
+);
+
+alter table public.optimized_resumes enable row level security;
+
+create policy "optimized_resumes_select_own"
+    on public.optimized_resumes for select
+    using (auth.uid() = user_id);
+
+create policy "optimized_resumes_insert_own"
+    on public.optimized_resumes for insert
+    with check (auth.uid() = user_id);
+
+create policy "optimized_resumes_delete_own"
+    on public.optimized_resumes for delete
+    using (auth.uid() = user_id);
+
+-- Extend applications with new columns (idempotent)
+alter table public.applications
+    add column if not exists tailored_resume_url text,
+    add column if not exists email_thread_id text,
+    add column if not exists match_score integer;

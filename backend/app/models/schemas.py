@@ -203,6 +203,60 @@ class JobSyncResult(BaseModel):
     errors: list[str] = Field(default_factory=list)
 
 
+# ── Planner models ───────────────────────────────────────────────────────────
+
+class SearchPlan(BaseModel):
+    """Structured search plan produced by the planner agent."""
+
+    roles: list[str] = Field(default_factory=list, description="Job titles/roles to search")
+    location: str | None = Field(None, description="Target location (city, region)")
+    salary_min: float | None = Field(None, ge=0, description="Minimum salary")
+    salary_max: float | None = Field(None, ge=0, description="Maximum salary")
+    remote: bool | None = Field(None, description="Remote preference")
+    employment_type: str | None = Field(None, description="full-time, part-time, contract, etc.")
+    experience_level: str | None = Field(None, description="entry, mid, senior, lead")
+    max_applications: int = Field(10, ge=1, le=100, description="Max applications to process")
+
+
+class PlannerRequest(BaseModel):
+    """User's natural language query for the planner agent."""
+
+    query: str = Field(..., min_length=3, max_length=1000, description="Natural language job search request")
+
+
+class PlannerResponse(BaseModel):
+    """Structured plan returned by the planner agent."""
+
+    search_plan: SearchPlan
+    suggestions: list[str] = Field(default_factory=list, description="Suggested refinements or clarifications")
+
+
+# ── Optimized resume models ─────────────────────────────────────────────────
+
+class OptimizedResumeOut(BaseModel):
+    """A per-job tailored resume version."""
+
+    id: str
+    job_id: str
+    storage_path: str
+    summary: str | None = None
+    skills: list[str] = Field(default_factory=list)
+    created_at: datetime | None = None
+
+
+class TailorResumeRequest(BaseModel):
+    """Request to tailor a resume for a specific job."""
+
+    job_id: str
+
+
+class TailorResumeResponse(BaseModel):
+    """Result of tailoring a resume."""
+
+    optimized_resume: OptimizedResumeOut
+    tailored_profile: dict[str, Any] = Field(default_factory=dict, description="Tailored profile fields")
+
+
 # ── Phase 3: Match + Application models ──────────────────────────────────────
 
 class MatchBreakdown(BaseModel):
@@ -236,6 +290,9 @@ class ApplicationUpdate(BaseModel):
     status: str | None = None
     cover_letter: str | None = None
     notes: str | None = None
+    tailored_resume_url: str | None = None
+    email_thread_id: str | None = None
+    match_score: int | None = None
 
 
 class ApplicationOut(BaseModel):
@@ -244,6 +301,9 @@ class ApplicationOut(BaseModel):
     status: str
     cover_letter: str | None = None
     notes: str | None = None
+    tailored_resume_url: str | None = None
+    email_thread_id: str | None = None
+    match_score: int | None = Field(None, ge=0, le=100)
     applied_at: datetime | None = None
     created_at: datetime | None = None
     updated_at: datetime | None = None

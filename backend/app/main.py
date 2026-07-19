@@ -120,6 +120,14 @@ def create_app() -> FastAPI:
 
     app.include_router(applications_router)
 
+    from app.api.planner import router as planner_router
+
+    app.include_router(planner_router)
+
+    from app.api.resume_tailor import router as resume_tailor_router
+
+    app.include_router(resume_tailor_router)
+
     return app
 
 

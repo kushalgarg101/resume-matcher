@@ -73,6 +73,37 @@ def download_resume(*, storage_path: str) -> bytes:
     return data
 
 
+def upload_tailored_resume(
+    *,
+    user_id: str,
+    job_id: str,
+    text: str,
+) -> str:
+    """
+    Upload a tailored resume text to the private storage bucket.
+
+    Args:
+        user_id: Owner's uuid.
+        job_id: The job uuid (used in the filename).
+        text: The tailored resume text content.
+
+    Returns:
+        The storage path for later retrieval.
+    """
+    settings = get_settings()
+    path = f"{user_id}/optimized/{job_id}.txt"
+    client = get_admin_client()
+    try:
+        client.storage.from_(settings.supabase_storage_bucket).upload(
+            path=path,
+            file=text.encode("utf-8"),
+            file_options={"content-type": "text/plain", "upsert": True},
+        )
+    except Exception as exc:
+        raise StorageError(f"Failed to upload tailored resume: {exc}") from exc
+    return path
+
+
 def delete_resume(*, storage_path: str) -> None:
     """
     Delete a resume PDF from Storage (used to bound storage growth).
