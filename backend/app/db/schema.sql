@@ -338,3 +338,7 @@ alter table public.applications
     add column if not exists tailored_resume_url text,
     add column if not exists email_thread_id text,
     add column if not exists match_score integer;
+
+-- Email monitoring config on user_profiles
+alter table public.user_profiles
+    add column if not exists email_config jsonb default '{}'::jsonb;

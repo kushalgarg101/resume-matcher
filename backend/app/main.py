@@ -128,6 +128,10 @@ def create_app() -> FastAPI:
 
     app.include_router(resume_tailor_router)
 
+    from app.api.email import router as email_router
+
+    app.include_router(email_router)
+
     return app
 
 

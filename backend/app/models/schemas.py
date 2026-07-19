@@ -95,6 +95,7 @@ class UserProfileUpdate(BaseModel):
     preferred_locations: list[str] | None = None
     is_open_to_work: bool | None = None
     is_complete: bool | None = None
+    email_config: dict[str, Any] | None = None
 
 
 class UserProfileOut(BaseModel):
@@ -324,6 +325,55 @@ class CoverLetterRequest(BaseModel):
 
 class CoverLetterResponse(BaseModel):
     cover_letter: str
+
+
+# ── Email monitoring models ─────────────────────────────────────────────────
+
+class EmailConfig(BaseModel):
+    """User's email monitoring configuration."""
+
+    provider: str = Field("imap", description="Email provider type: imap, gmail")
+    imap_host: str | None = Field(None, description="IMAP server hostname")
+    imap_port: int | None = Field(993, description="IMAP server port")
+    email_address: str | None = Field(None, description="Email address to monitor")
+    app_password: str | None = Field(None, description="App password or IMAP password")
+    use_ssl: bool = True
+    last_sync_at: str | None = Field(None, description="Last successful sync timestamp")
+    enabled: bool = False
+
+
+class EmailConfigUpdate(BaseModel):
+    """Update email monitoring configuration. Only provided fields are changed."""
+
+    imap_host: str | None = None
+    imap_port: int | None = None
+    email_address: str | None = None
+    app_password: str | None = None
+    use_ssl: bool | None = None
+    enabled: bool | None = None
+
+
+class EmailSyncResult(BaseModel):
+    """Result of a single email sync operation."""
+
+    processed: int = 0
+    matched: int = 0
+    updated_applications: int = 0
+    errors: list[str] = Field(default_factory=list)
+
+
+class ClassifiedEmail(BaseModel):
+    """A classified email from the monitoring system."""
+
+    message_id: str
+    subject: str
+    from_address: str
+    received_at: str
+    category: str
+    confidence: float
+    company_name: str | None = None
+    job_title: str | None = None
+    summary: str = ""
 
 
 # ── Raw DB row helpers ───────────────────────────────────────────────────────
