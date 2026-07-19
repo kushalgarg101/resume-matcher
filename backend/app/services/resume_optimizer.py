@@ -97,17 +97,24 @@ def tailor_resume(
 
             experience_raw = result.get("experience", [])
             experience = []
-            for i, exp_item in enumerate(experience_raw if isinstance(experience_raw, list) else []):
-                if isinstance(exp_item, dict):
-                    orig = profile.experience[i] if i < len(profile.experience) else None
-                    experience.append({
-                        "company": exp_item.get("company", orig.company if orig else ""),
-                        "role": exp_item.get("role", orig.role if orig else ""),
-                        "start_date": exp_item.get("start_date") or (orig.start_date if orig else None),
-                        "end_date": exp_item.get("end_date") or (orig.end_date if orig else None),
-                        "description": exp_item.get("description", orig.description if orig else ""),
-                        "current": exp_item.get("current", orig.current if orig else False),
-                    })
+            for exp_item in (experience_raw if isinstance(experience_raw, list) else []):
+                if not isinstance(exp_item, dict):
+                    continue
+                exp_company = (exp_item.get("company") or "").strip().lower()
+                exp_role = (exp_item.get("role") or "").strip().lower()
+                orig = None
+                for oe in profile.experience:
+                    if oe.company.strip().lower() == exp_company and oe.role.strip().lower() == exp_role:
+                        orig = oe
+                        break
+                experience.append({
+                    "company": exp_item.get("company", orig.company if orig else ""),
+                    "role": exp_item.get("role", orig.role if orig else ""),
+                    "start_date": exp_item.get("start_date") or (orig.start_date if orig else None),
+                    "end_date": exp_item.get("end_date") or (orig.end_date if orig else None),
+                    "description": exp_item.get("description", orig.description if orig else ""),
+                    "current": exp_item.get("current", orig.current if orig else False),
+                })
 
             return {
                 "summary": result.get("summary", profile.summary),

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Briefcase, FileText, LogOut, Plus, Send, UserCircle, Sparkles } from "lucide-react";
+import { Briefcase, FileText, LogOut, Plus, Send, UserCircle, Sparkles, Mail } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -103,6 +103,12 @@ export default function Navbar() {
                   <Link href="/profile">
                     <UserCircle className="h-4 w-4" />
                     Profile
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link href="/settings">
+                    <Mail className="h-4 w-4" />
+                    Settings
                   </Link>
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />

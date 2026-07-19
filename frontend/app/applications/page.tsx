@@ -368,14 +368,6 @@ export default function ApplicationsPage() {
                   )}
                 </div>
 
-                {selected.tailored_resume_url && (
-                  <div className="mb-4">
-                    <Button variant="outline" size="sm" className="w-full rounded-lg text-xs" onClick={() => window.open(selected.tailored_resume_url!, "_blank")}>
-                      <ExternalLink className="mr-1.5 h-3.5 w-3.5" /> View Tailored Resume
-                    </Button>
-                  </div>
-                )}
-
                 <Separator className="mb-4" />
 
                 {selected.cover_letter && (
