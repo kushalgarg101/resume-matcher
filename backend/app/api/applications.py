@@ -11,6 +11,8 @@ from app.models.schemas import (
     ApplicationCreate,
     ApplicationOut,
     ApplicationUpdate,
+    BatchMatchRequest,
+    BatchMatchResponse,
     CoverLetterRequest,
     CoverLetterResponse,
     JobMatchResult,
@@ -59,6 +61,9 @@ def _app_to_out(row: dict, job_row: dict | None = None) -> ApplicationOut:
         status=row.get("status", "draft"),
         cover_letter=row.get("cover_letter"),
         notes=row.get("notes"),
+        tailored_resume_url=row.get("tailored_resume_url"),
+        email_thread_id=row.get("email_thread_id"),
+        match_score=row.get("match_score"),
         applied_at=row.get("applied_at"),
         created_at=row.get("created_at"),
         updated_at=row.get("updated_at"),
@@ -106,6 +111,51 @@ async def get_job_match(
         breakdown=result["breakdown"],
         details=result["details"],
     )
+
+
+# ── Batch Match ──────────────────────────────────────────────────────────────
+
+
+@router.post("/jobs/match-batch", response_model=BatchMatchResponse)
+async def batch_match_jobs(
+    body: BatchMatchRequest,
+    request: Request,
+    user_id: str = Depends(get_current_user),
+):
+    """Compute match scores for multiple jobs at once using the user's profile."""
+    token = _token_from_request(request)
+    user_client = get_user_client(token)
+
+    profile_res = (
+        user_client.table("user_profiles")
+        .select("*")
+        .eq("user_id", user_id)
+        .execute()
+    )
+    if getattr(profile_res, "error", None) or not profile_res.data:
+        raise HTTPException(status_code=404, detail="No profile found.")
+
+    profile = profile_res.data[0]
+    matches: dict[str, JobMatchResult] = {}
+
+    for job_id in body.job_ids:
+        job_res = (
+            user_client.table("jobs")
+            .select("*")
+            .eq("id", job_id)
+            .execute()
+        )
+        if getattr(job_res, "error", None) or not job_res.data:
+            continue
+
+        result = compute_match(profile, job_res.data[0])
+        matches[job_id] = JobMatchResult(
+            score=result["score"],
+            breakdown=result["breakdown"],
+            details=result["details"],
+        )
+
+    return BatchMatchResponse(matches=matches)
 
 
 # ── Cover Letter ─────────────────────────────────────────────────────────────

@@ -280,6 +280,14 @@ class JobMatchResult(BaseModel):
     details: MatchDetails = Field(default_factory=MatchDetails)
 
 
+class BatchMatchRequest(BaseModel):
+    job_ids: list[str] = Field(..., min_length=1, max_length=100)
+
+
+class BatchMatchResponse(BaseModel):
+    matches: dict[str, JobMatchResult] = Field(default_factory=dict)
+
+
 class ApplicationCreate(BaseModel):
     job_id: str
     cover_letter: str | None = None
