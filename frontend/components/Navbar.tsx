@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Briefcase, FileText, LogOut, Plus, Send, UserCircle } from "lucide-react";
+import { Briefcase, FileText, LogOut, Plus, Send, UserCircle, Sparkles } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -41,6 +41,12 @@ export default function Navbar() {
                 Jobs
               </Link>
             </Button>
+            <Button asChild size="sm" variant="ghost" className="hidden sm:inline-flex">
+              <Link href="/applications/auto">
+                <Sparkles className="h-4 w-4" />
+                Auto-Apply
+              </Link>
+            </Button>
             <Button asChild size="sm" className="hidden sm:inline-flex">
               <Link href="/upload">
                 <Plus className="h-4 w-4" />
@@ -67,6 +73,12 @@ export default function Navbar() {
                   <Link href="/jobs">
                     <Briefcase className="h-4 w-4" />
                     Browse Jobs
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link href="/applications/auto">
+                    <Sparkles className="h-4 w-4" />
+                    Auto-Apply
                   </Link>
                 </DropdownMenuItem>
                 <DropdownMenuItem asChild>

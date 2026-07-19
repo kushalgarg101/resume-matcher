@@ -367,6 +367,20 @@ export async function getJobMatch(jobId: string): Promise<JobMatchResult> {
   return res.json();
 }
 
+export interface BatchMatchResponse {
+  matches: Record<string, JobMatchResult>;
+}
+
+export async function batchMatchJobs(jobIds: string[]): Promise<BatchMatchResponse> {
+  const res = await fetch(apiUrl("/api/jobs/match-batch"), {
+    method: "POST",
+    headers: { ...(await authHeaders()), "Content-Type": "application/json" },
+    body: JSON.stringify({ job_ids: jobIds }),
+  });
+  if (!res.ok) throw new ApiError(res.status, `Batch match failed (${res.status})`);
+  return res.json();
+}
+
 // ── Cover Letter ────────────────────────────────────────────────────────────
 
 export async function generateCoverLetter(jobId: string): Promise<string> {

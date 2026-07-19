@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Loader2, ArrowLeft, Briefcase, Send, CheckCircle2, XCircle, Clock, Calendar, Building2, ExternalLink } from "lucide-react";
+import { Loader2, ArrowLeft, Briefcase, Send, CheckCircle2, XCircle, Clock, Calendar, Building2, ExternalLink, Sparkles, TrendingUp } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -64,15 +65,55 @@ export default function ApplicationsPage() {
         </div>
       </div>
 
-      {error && <p className="mb-4 text-sm text-destructive">{error}</p>}
+      {/* Stats */}
+      {!loading && apps.length > 0 && (
+        <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-5">
+          {[
+            { label: "Total", value: apps.length, icon: Briefcase, color: "text-primary bg-primary/10" },
+            { label: "Applied", value: apps.filter((a) => a.status === "applied").length, icon: Send, color: "text-blue-600 bg-blue-100" },
+            { label: "Interviewing", value: apps.filter((a) => a.status === "interviewing").length, icon: Calendar, color: "text-amber-600 bg-amber-100" },
+            { label: "Offers", value: apps.filter((a) => a.status === "offer").length, icon: CheckCircle2, color: "text-green-600 bg-green-100" },
+            { label: "Response Rate", value: apps.filter((a) => a.status === "interviewing" || a.status === "offer").length, total: apps.filter((a) => a.status !== "draft").length, icon: TrendingUp, color: "text-purple-600 bg-purple-100" },
+          ].map((s) => (
+            <div key={s.label} className="rounded-xl border border-border/80 bg-card/60 p-3.5">
+              <div className="flex items-center gap-2.5">
+                <span className={`flex h-8 w-8 items-center justify-center rounded-lg ${s.color}`}>
+                  <s.icon className="h-4 w-4" />
+                </span>
+                <div>
+                  <p className="text-lg font-bold leading-tight">
+                    {s.total !== undefined ? (
+                      s.total > 0 ? `${Math.round((s.value / s.total) * 100)}%` : "—"
+                    ) : s.value}
+                  </p>
+                  <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">{s.label}</p>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div className="mb-6 flex items-center justify-between">
+        {error && <p className="text-sm text-destructive">{error}</p>}
+        {!loading && apps.length === 0 && (
+          <p className="text-sm text-muted-foreground">
+            No applications yet. Browse jobs and apply to track them here.
+          </p>
+        )}
+        <div className="ml-auto">
+          <Button asChild variant="default" size="sm" className="rounded-xl">
+            <Link href="/applications/auto">
+              <Sparkles className="mr-1.5 h-4 w-4" />
+              Auto-Apply
+            </Link>
+          </Button>
+        </div>
+      </div>
 
       {loading ? (
         <div className="flex items-center justify-center py-16"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
-      ) : apps.length === 0 ? (
-        <div className="py-16 text-center text-sm text-muted-foreground">
-          No applications yet. Browse jobs and apply to track them here.
-        </div>
-      ) : (
+      ) : apps.length === 0 ? null : (
         <div className="flex flex-col gap-4 lg:flex-row">
           {/* List */}
           <div className={`space-y-2 ${selected ? "hidden lg:block lg:w-1/2" : "w-full"}`}>
@@ -99,6 +140,13 @@ export default function ApplicationsPage() {
                           {cfg.icon}
                           {cfg.label}
                         </span>
+                        {app.match_score != null && (
+                          <span className={`font-bold ${
+                            app.match_score >= 70 ? "text-green-600" : app.match_score >= 40 ? "text-amber-600" : "text-muted-foreground"
+                          }`}>
+                            {app.match_score}%
+                          </span>
+                        )}
                         {app.applied_at && (
                           <span>{new Date(app.applied_at).toLocaleDateString()}</span>
                         )}
@@ -153,6 +201,23 @@ export default function ApplicationsPage() {
                     })}
                   </div>
                 </div>
+
+                {selected.match_score != null && (
+                  <div className="mb-4 flex items-center gap-2 rounded-xl bg-primary/5 px-3 py-2 border border-primary/10">
+                    <span className="text-xs font-medium text-muted-foreground">Match Score:</span>
+                    <span className={`text-lg font-bold ${
+                      selected.match_score >= 70 ? "text-green-600" : selected.match_score >= 40 ? "text-amber-600" : "text-muted-foreground"
+                    }`}>{selected.match_score}%</span>
+                  </div>
+                )}
+
+                {selected.tailored_resume_url && (
+                  <div className="mb-4">
+                    <Button variant="outline" size="sm" className="w-full rounded-lg text-xs" onClick={() => window.open(selected.tailored_resume_url!, "_blank")}>
+                      <ExternalLink className="mr-1.5 h-3.5 w-3.5" /> View Tailored Resume
+                    </Button>
+                  </div>
+                )}
 
                 <Separator className="mb-4" />
 
