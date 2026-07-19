@@ -507,3 +507,124 @@ export async function getTailoredResume(jobId: string): Promise<OptimizedResume 
   const data = await res.json();
   return data as OptimizedResume | null;
 }
+
+// ── Email Monitoring ────────────────────────────────────────────────────────
+
+export interface EmailConfig {
+  provider: string;
+  imap_host?: string | null;
+  imap_port?: number | null;
+  email_address?: string | null;
+  app_password?: string | null;
+  use_ssl: boolean;
+  last_sync_at?: string | null;
+  enabled: boolean;
+}
+
+export interface EmailSyncResult {
+  processed: number;
+  matched: number;
+  updated_applications: number;
+  errors: string[];
+}
+
+export async function getEmailConfig(): Promise<EmailConfig | null> {
+  const res = await fetch(apiUrl("/api/email/config"), {
+    headers: await authHeaders(),
+  });
+  if (!res.ok) {
+    if (res.status === 404) return null;
+    throw new ApiError(res.status, `Get email config failed (${res.status})`);
+  }
+  const data = await res.json();
+  return data as EmailConfig | null;
+}
+
+export async function updateEmailConfig(data: Partial<EmailConfig>): Promise<EmailConfig> {
+  const res = await fetch(apiUrl("/api/email/config"), {
+    method: "PUT",
+    headers: { ...(await authHeaders()), "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) throw new ApiError(res.status, `Update email config failed (${res.status})`);
+  return res.json();
+}
+
+export async function syncEmails(): Promise<EmailSyncResult> {
+  const res = await fetch(apiUrl("/api/email/sync"), {
+    method: "POST",
+    headers: await authHeaders(),
+  });
+  if (!res.ok) throw new ApiError(res.status, `Email sync failed (${res.status})`);
+  return res.json();
+}
+
+// ── Interview Stages ─────────────────────────────────────────────────────────
+
+export interface InterviewStage {
+  id: string;
+  application_id: string;
+  stage_name: string;
+  scheduled_at?: string | null;
+  status: string;
+  notes?: string | null;
+  prep_materials?: string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+}
+
+export interface CreateInterviewStage {
+  application_id: string;
+  stage_name: string;
+  scheduled_at?: string | null;
+  notes?: string | null;
+  prep_materials?: string | null;
+}
+
+export interface UpdateInterviewStage {
+  stage_name?: string | null;
+  scheduled_at?: string | null;
+  status?: string | null;
+  notes?: string | null;
+  prep_materials?: string | null;
+}
+
+export async function listInterviewStages(applicationId: string): Promise<InterviewStage[]> {
+  const res = await fetch(apiUrl(`/api/applications/${applicationId}/stages`), {
+    headers: await authHeaders(),
+  });
+  if (!res.ok) throw new ApiError(res.status, `Failed to list stages (${res.status})`);
+  return res.json();
+}
+
+export async function createInterviewStage(data: CreateInterviewStage): Promise<InterviewStage> {
+  const res = await fetch(apiUrl(`/api/applications/${data.application_id}/stages`), {
+    method: "POST",
+    headers: { ...(await authHeaders()), "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) throw new ApiError(res.status, `Failed to create stage (${res.status})`);
+  return res.json();
+}
+
+export async function updateInterviewStage(
+  applicationId: string,
+  stageId: string,
+  data: UpdateInterviewStage
+): Promise<InterviewStage> {
+  const res = await fetch(apiUrl(`/api/applications/${applicationId}/stages/${stageId}`), {
+    method: "PATCH",
+    headers: { ...(await authHeaders()), "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) throw new ApiError(res.status, `Failed to update stage (${res.status})`);
+  return res.json();
+}
+
+export async function deleteInterviewStage(applicationId: string, stageId: string): Promise<void> {
+  const res = await fetch(apiUrl(`/api/applications/${applicationId}/stages/${stageId}`), {
+    method: "DELETE",
+    headers: await authHeaders(),
+  });
+  if (!res.ok) throw new ApiError(res.status, `Failed to delete stage (${res.status})`);
+}

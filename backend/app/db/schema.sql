@@ -342,3 +342,42 @@ alter table public.applications
 -- Email monitoring config on user_profiles
 alter table public.user_profiles
     add column if not exists email_config jsonb default '{}'::jsonb;
+
+-- ============================================================================
+-- Phase 5: Interview tracking
+-- ============================================================================
+
+create table if not exists public.interview_stages (
+    id              uuid primary key default gen_random_uuid(),
+    user_id         uuid not null references auth.users (id) on delete cascade,
+    application_id  uuid not null references public.applications (id) on delete cascade,
+    stage_name      text not null,                     -- e.g. 'phone_screen', 'technical', 'onsite', 'hm', 'offer'
+    scheduled_at    timestamptz,
+    status          text not null default 'pending'
+                      check (status in ('pending', 'completed', 'cancelled', 'no_show')),
+    notes           text,
+    prep_materials  text,
+    created_at      timestamptz not null default now(),
+    updated_at      timestamptz not null default now()
+);
+
+create index if not exists interview_stages_application_id_idx on public.interview_stages (application_id);
+create index if not exists interview_stages_user_id_idx on public.interview_stages (user_id);
+
+alter table public.interview_stages enable row level security;
+
+create policy "interview_stages_select_own"
+    on public.interview_stages for select
+    using (auth.uid() = user_id);
+
+create policy "interview_stages_insert_own"
+    on public.interview_stages for insert
+    with check (auth.uid() = user_id);
+
+create policy "interview_stages_update_own"
+    on public.interview_stages for update
+    using (auth.uid() = user_id);
+
+create policy "interview_stages_delete_own"
+    on public.interview_stages for delete
+    using (auth.uid() = user_id);

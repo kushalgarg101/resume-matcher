@@ -132,6 +132,10 @@ def create_app() -> FastAPI:
 
     app.include_router(email_router)
 
+    from app.api.interviews import router as interviews_router
+
+    app.include_router(interviews_router)
+
     return app
 
 

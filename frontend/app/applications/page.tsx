@@ -3,12 +3,14 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Loader2, ArrowLeft, Briefcase, Send, CheckCircle2, XCircle, Clock, Calendar, Building2, ExternalLink, Sparkles, TrendingUp } from "lucide-react";
+import { Loader2, ArrowLeft, Briefcase, Send, CheckCircle2, XCircle, Clock, Calendar, Building2, ExternalLink, Sparkles, TrendingUp, Plus, Trash2, CalendarDays } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { listApplications, updateApplication, Application } from "@/lib/api";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { listApplications, updateApplication, Application, listInterviewStages, createInterviewStage, updateInterviewStage, deleteInterviewStage, InterviewStage, CreateInterviewStage } from "@/lib/api";
 
 const statusConfig: Record<string, { label: string; color: string; icon: React.ReactNode }> = {
   draft: { label: "Draft", color: "bg-muted text-muted-foreground", icon: <Clock className="h-3 w-3" /> },
@@ -30,6 +32,11 @@ export default function ApplicationsPage() {
   const [updating, setUpdating] = useState<string | null>(null);
   const [error, setError] = useState("");
 
+  const [stages, setStages] = useState<InterviewStage[]>([]);
+  const [stagesLoading, setStagesLoading] = useState(false);
+  const [addingStage, setAddingStage] = useState(false);
+  const [stageForm, setStageForm] = useState({ stage_name: "", scheduled_at: "", notes: "", prep_materials: "" });
+
   useEffect(() => {
     if (!authLoading && !user) router.replace("/login");
   }, [authLoading, user, router]);
@@ -49,6 +56,50 @@ export default function ApplicationsPage() {
       setApps((prev) => prev.map((a) => (a.id === appId ? updated : a)));
       if (selected?.id === appId) setSelected(updated);
     } catch { setError("Failed to update status."); } finally { setUpdating(null); }
+  };
+
+  const loadStages = async (applicationId: string) => {
+    setStagesLoading(true);
+    try {
+      const data = await listInterviewStages(applicationId);
+      setStages(data);
+    } catch { /* silently ignore */ } finally { setStagesLoading(false); }
+  };
+
+  useEffect(() => {
+    if (selected) loadStages(selected.id);
+    else setStages([]);
+  }, [selected]);
+
+  const handleAddStage = async () => {
+    if (!stageForm.stage_name.trim() || !selected) return;
+    try {
+      await createInterviewStage({
+        application_id: selected.id,
+        stage_name: stageForm.stage_name.trim(),
+        scheduled_at: stageForm.scheduled_at || undefined,
+        notes: stageForm.notes || undefined,
+        prep_materials: stageForm.prep_materials || undefined,
+      } as CreateInterviewStage);
+      setStageForm({ stage_name: "", scheduled_at: "", notes: "", prep_materials: "" });
+      setAddingStage(false);
+      loadStages(selected.id);
+    } catch { setError("Failed to add stage."); }
+  };
+
+  const handleStageStatusToggle = async (stage: InterviewStage) => {
+    const nextStatus = stage.status === "pending" ? "completed" : stage.status === "completed" ? "pending" : stage.status === "cancelled" ? "pending" : "pending";
+    try {
+      await updateInterviewStage(stage.application_id, stage.id, { status: nextStatus } as {});
+      loadStages(stage.application_id);
+    } catch { setError("Failed to update stage."); }
+  };
+
+  const handleDeleteStage = async (stage: InterviewStage) => {
+    try {
+      await deleteInterviewStage(stage.application_id, stage.id);
+      loadStages(stage.application_id);
+    } catch { setError("Failed to delete stage."); }
   };
 
   if (authLoading) return <div className="flex min-h-[60vh] items-center justify-center"><Loader2 className="h-6 w-6 animate-spin" /></div>;
@@ -210,6 +261,108 @@ export default function ApplicationsPage() {
                     }`}>{selected.match_score}%</span>
                   </div>
                 )}
+
+                {/* Interview Stages */}
+                <div className="mb-4">
+                  <div className="mb-3 flex items-center justify-between">
+                    <h3 className="flex items-center gap-1 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                      <CalendarDays className="h-3.5 w-3.5" />
+                      Interview Stages
+                    </h3>
+                    <button
+                      onClick={() => setAddingStage(!addingStage)}
+                      className="flex items-center gap-1 text-xs font-medium text-primary hover:text-primary/80 transition-colors"
+                    >
+                      <Plus className="h-3.5 w-3.5" />
+                      {addingStage ? "Cancel" : "Add"}
+                    </button>
+                  </div>
+
+                  {addingStage && (
+                    <div className="mb-3 rounded-xl border border-border bg-muted/30 p-3 space-y-2">
+                      <Input
+                        placeholder="Stage name (e.g. Phone Screen, Technical, Onsite)"
+                        value={stageForm.stage_name}
+                        onChange={(e) => setStageForm((p) => ({ ...p, stage_name: e.target.value }))}
+                        className="h-8 text-xs rounded-lg"
+                      />
+                      <Input
+                        type="datetime-local"
+                        value={stageForm.scheduled_at}
+                        onChange={(e) => setStageForm((p) => ({ ...p, scheduled_at: e.target.value }))}
+                        className="h-8 text-xs rounded-lg"
+                      />
+                      <Textarea
+                        placeholder="Notes..."
+                        value={stageForm.notes}
+                        onChange={(e) => setStageForm((p) => ({ ...p, notes: e.target.value }))}
+                        className="min-h-[60px] text-xs rounded-lg"
+                      />
+                      <Textarea
+                        placeholder="Prep materials..."
+                        value={stageForm.prep_materials}
+                        onChange={(e) => setStageForm((p) => ({ ...p, prep_materials: e.target.value }))}
+                        className="min-h-[60px] text-xs rounded-lg"
+                      />
+                      <div className="flex justify-end gap-2">
+                        <Button variant="ghost" size="sm" className="h-7 text-xs rounded-lg" onClick={() => setAddingStage(false)}>Cancel</Button>
+                        <Button variant="default" size="sm" className="h-7 text-xs rounded-lg" onClick={handleAddStage}>Save</Button>
+                      </div>
+                    </div>
+                  )}
+
+                  {stagesLoading ? (
+                    <div className="flex items-center justify-center py-4"><Loader2 className="h-4 w-4 animate-spin text-muted-foreground" /></div>
+                  ) : stages.length === 0 ? (
+                    <p className="text-xs text-muted-foreground/60 italic">No interview stages yet.</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {stages.map((stage) => (
+                        <div key={stage.id} className="rounded-lg border border-border bg-card p-3">
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-center gap-2">
+                                <span className="text-sm font-medium">{stage.stage_name}</span>
+                                <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium ${
+                                  stage.status === "completed" ? "bg-green-100 text-green-700" :
+                                  stage.status === "cancelled" ? "bg-red-100 text-red-700" :
+                                  stage.status === "no_show" ? "bg-orange-100 text-orange-700" :
+                                  "bg-blue-100 text-blue-700"
+                                }`}>{stage.status}</span>
+                              </div>
+                              {stage.scheduled_at && (
+                                <p className="mt-1 flex items-center gap-1 text-[10px] text-muted-foreground">
+                                  <Calendar className="h-3 w-3" />
+                                  {new Date(stage.scheduled_at).toLocaleString()}
+                                </p>
+                              )}
+                              {stage.notes && <p className="mt-1 text-[11px] text-muted-foreground">{stage.notes}</p>}
+                              {stage.prep_materials && <p className="mt-1 text-[11px] text-muted-foreground/70 italic">{stage.prep_materials}</p>}
+                            </div>
+                            <div className="flex items-center gap-1 shrink-0">
+                              <button
+                                onClick={() => handleStageStatusToggle(stage)}
+                                className={`rounded p-1 transition-colors ${
+                                  stage.status === "completed" ? "text-green-600 hover:bg-green-100" : "text-muted-foreground hover:bg-muted"
+                                }`}
+                                title={stage.status === "completed" ? "Mark pending" : "Mark completed"}
+                              >
+                                <CheckCircle2 className="h-3.5 w-3.5" />
+                              </button>
+                              <button
+                                onClick={() => handleDeleteStage(stage)}
+                                className="rounded p-1 text-muted-foreground hover:bg-red-100 hover:text-red-600 transition-colors"
+                                title="Delete stage"
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
 
                 {selected.tailored_resume_url && (
                   <div className="mb-4">

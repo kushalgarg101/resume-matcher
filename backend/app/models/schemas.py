@@ -376,6 +376,36 @@ class ClassifiedEmail(BaseModel):
     summary: str = ""
 
 
+# ── Interview stage models ──────────────────────────────────────────────────
+
+class InterviewStageCreate(BaseModel):
+    application_id: str
+    stage_name: str = Field(..., min_length=1, max_length=100)
+    scheduled_at: str | None = None
+    notes: str | None = None
+    prep_materials: str | None = None
+
+
+class InterviewStageUpdate(BaseModel):
+    stage_name: str | None = None
+    scheduled_at: str | None = None
+    status: str | None = None
+    notes: str | None = None
+    prep_materials: str | None = None
+
+
+class InterviewStageOut(BaseModel):
+    id: str
+    application_id: str
+    stage_name: str
+    scheduled_at: str | None = None
+    status: str
+    notes: str | None = None
+    prep_materials: str | None = None
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
+
+
 # ── Raw DB row helpers ───────────────────────────────────────────────────────
 
 def profile_from_db(row: dict[str, Any]) -> UserProfileOut:
