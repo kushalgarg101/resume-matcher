@@ -112,7 +112,8 @@ def fetch_recent_emails(
                 received_at = datetime.now(timezone.utc).isoformat()
 
             body = _get_email_body(msg)
-            message_id = msg.get("Message-ID", str(mid))
+            raw_message_id = msg.get("Message-ID")
+            message_id = _decode_header_value(raw_message_id) if raw_message_id else str(mid.decode("ascii", errors="replace"))
 
             emails_list.append({
                 "message_id": message_id,
@@ -163,7 +164,7 @@ def sync_and_classify(
     # Build a lookup: company names → application ids
     company_to_app: dict[str, str] = {}
     for app in applications:
-        job = app.get("job") or {}
+        job = app.get("jobs") or {}
         company = (job.get("company_name") or "").strip().lower()
         if company:
             company_to_app[company] = app.get("id", "")

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import time
 from typing import Any
 
 from groq import Groq
@@ -69,7 +70,6 @@ def generate_cover_letter(
             return response.choices[0].message.content or ""
         except Exception as exc:
             if attempt < settings.groq_max_retries:
-                import time
                 time.sleep(min(2 ** (attempt - 1), 10.0))
                 continue
             raise LLMError(f"Cover letter generation failed: {exc}") from exc

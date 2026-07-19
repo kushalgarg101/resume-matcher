@@ -15,7 +15,8 @@ from app.models.schemas import (
     profile_from_db,
 )
 from app.services.resume_optimizer import tailor_resume
-from app.services.storage import upload_tailored_resume
+from app.services.storage import download_resume, upload_tailored_resume
+from app.services.pdf_extract import extract_pdf_text
 
 router = APIRouter(prefix="/api/resume", tags=["Resume"])
 
@@ -63,10 +64,10 @@ async def tailor_resume_endpoint(
         raise HTTPException(status_code=404, detail="Job not found.")
     job = job_res.data[0]
 
-    # Get latest analysis resume text for extra context (best-effort)
+    # Get latest analysis to fetch original resume text from storage
     analysis_res = (
         user_client.table("analyses")
-        .select("jd_text")
+        .select("storage_path")
         .eq("user_id", user_id)
         .order("created_at", desc=True)
         .limit(1)
@@ -74,7 +75,13 @@ async def tailor_resume_endpoint(
     )
     resume_text = None
     if not getattr(analysis_res, "error", None) and analysis_res.data:
-        pass  # Could fetch the original resume text from storage if needed
+        storage_path = analysis_res.data[0].get("storage_path")
+        if storage_path:
+            try:
+                pdf_bytes = download_resume(storage_path=storage_path)
+                resume_text = extract_pdf_text(pdf_bytes)
+            except Exception:
+                pass  # best-effort; optimizer can still work without raw text
 
     # Generate tailored resume
     try:

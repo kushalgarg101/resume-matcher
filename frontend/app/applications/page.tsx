@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Loader2, ArrowLeft, Briefcase, Send, CheckCircle2, XCircle, Clock, Calendar, Building2, ExternalLink, Sparkles, TrendingUp, Plus, Trash2, CalendarDays } from "lucide-react";
@@ -36,6 +36,7 @@ export default function ApplicationsPage() {
   const [stagesLoading, setStagesLoading] = useState(false);
   const [addingStage, setAddingStage] = useState(false);
   const [stageForm, setStageForm] = useState({ stage_name: "", scheduled_at: "", notes: "", prep_materials: "" });
+  const stagesAppIdRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (!authLoading && !user) router.replace("/login");
@@ -59,11 +60,14 @@ export default function ApplicationsPage() {
   };
 
   const loadStages = async (applicationId: string) => {
+    stagesAppIdRef.current = applicationId;
     setStagesLoading(true);
     try {
       const data = await listInterviewStages(applicationId);
-      setStages(data);
-    } catch { /* silently ignore */ } finally { setStagesLoading(false); }
+      if (stagesAppIdRef.current === applicationId) setStages(data);
+    } catch { /* silently ignore */ } finally {
+      if (stagesAppIdRef.current === applicationId) setStagesLoading(false);
+    }
   };
 
   useEffect(() => {

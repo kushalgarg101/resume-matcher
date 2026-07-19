@@ -53,6 +53,7 @@ export default function AutoApplyPage() {
   const [appliedCount, setAppliedCount] = useState(0);
 
   const [error, setError] = useState("");
+  const [rankAttempted, setRankAttempted] = useState(false);
 
   useEffect(() => {
     if (!authLoading && !user) router.replace("/login");
@@ -114,14 +115,21 @@ export default function AutoApplyPage() {
       setJobs(scored);
       setSelectedIds(new Set(scored.filter((j) => j.matchScore >= 40).slice(0, 10).map((j) => j.id)));
       setStep("process");
-    } catch (e) { setError(e instanceof Error ? e.message : "Ranking failed."); } finally { setRanking(false); }
+    } catch (e) { setError(e instanceof Error ? e.message : "Ranking failed."); } finally { setRanking(false); setRankAttempted(true); }
   }, [planResult]);
 
   useEffect(() => {
-    if (step === "rank" && planResult && !ranking && jobs.length === 0) {
+    if (step === "rank" && planResult && !ranking && jobs.length === 0 && !rankAttempted) {
       handleRank();
     }
-  }, [step, planResult, ranking, jobs.length, handleRank]);
+  }, [step, planResult, ranking, jobs.length, handleRank, rankAttempted]);
+
+  const handleRetryRank = () => {
+    setRankAttempted(false);
+    setError("");
+    setRanking(true);
+    handleRank();
+  };
 
   const toggleJob = (id: string) => {
     setSelectedIds((prev) => {
@@ -283,8 +291,20 @@ export default function AutoApplyPage() {
       {/* Step 2: Finding (auto-transitions) */}
       {step === "rank" && (
         <div className="flex flex-col items-center justify-center py-16">
-          <Loader2 className="mb-4 h-8 w-8 animate-spin text-primary" />
-          <p className="text-sm text-muted-foreground">Searching and ranking jobs...</p>
+          {!rankAttempted || ranking ? (
+            <>
+              <Loader2 className="mb-4 h-8 w-8 animate-spin text-primary" />
+              <p className="text-sm text-muted-foreground">Searching and ranking jobs...</p>
+            </>
+          ) : (
+            <>
+              <p className="mb-4 text-sm text-destructive">Failed to find jobs. Try a different query.</p>
+              <Button variant="default" size="sm" className="rounded-xl" onClick={handleRetryRank}>
+                <Loader2 className="mr-1.5 h-4 w-4" />
+                Retry
+              </Button>
+            </>
+          )}
           {planResult && (
             <div className="mt-6 flex flex-wrap items-center gap-2 rounded-xl border border-primary/20 bg-primary/5 px-4 py-2.5 text-xs">
               <Sparkles className="h-3.5 w-3.5 text-primary" />

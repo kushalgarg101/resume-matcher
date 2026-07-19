@@ -87,6 +87,7 @@ async def update_email_config(
 @router.post("/sync", response_model=EmailSyncResult)
 async def sync_emails(
     request: Request,
+    hours_back: int = 24,
     user_id: str = Depends(get_current_user),
 ):
     """Fetch recent emails, classify them, and update matching applications."""
@@ -120,16 +121,16 @@ async def sync_emails(
     applications = apps_res.data if apps_res.data else []
 
     # Run sync
-    sync_result = sync_and_classify(config, applications)
+    sync_result = sync_and_classify(config, applications, hours_back=hours_back)
 
     # Apply status updates to matched applications
+    client = get_user_client(token)
     updated_count = 0
     for update in sync_result.get("updated_applications", []):
         app_id = update["application_id"]
         new_status = update["new_status"]
         email_thread_id = update["email_thread_id"]
 
-        client = get_user_client(token)
         upsert = (
             client.table("applications")
             .update({
@@ -145,7 +146,7 @@ async def sync_emails(
             updated_count += 1
 
     # Update last sync timestamp
-    get_user_client(token).table("user_profiles").update({
+    client.table("user_profiles").update({
         "email_config": {**config, "last_sync_at": _now()},
     }).eq("user_id", user_id).execute()
 
