@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import email
 import imaplib
-import traceback
 from datetime import datetime, timezone, timedelta
 from email.header import decode_header
 from email.utils import parsedate_to_datetime
