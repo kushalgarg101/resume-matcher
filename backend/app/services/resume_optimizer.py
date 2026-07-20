@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 import time
 from typing import Any
 
@@ -123,7 +122,7 @@ def tailor_resume(
                 "tailored_text": result.get("tailored_text", ""),
             }
 
-        except Exception as exc:
+        except Exception:
             if attempt < settings.groq_max_retries:
                 time.sleep(min(2 ** (attempt - 1), 10.0))
                 continue

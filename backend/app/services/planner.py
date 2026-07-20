@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 import time
 
 from groq import Groq
@@ -85,7 +84,7 @@ def plan_search(query: str, profile: dict | None = None) -> dict:
                 "suggestions": suggestions,
             }
 
-        except Exception as exc:
+        except Exception:
             if attempt < settings.groq_max_retries:
                 time.sleep(min(2 ** (attempt - 1), 10.0))
                 continue
